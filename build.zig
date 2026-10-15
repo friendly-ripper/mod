@@ -4,7 +4,7 @@
 //!   zig/toolchains.zig  pinned SDKs: fetch-toolchains and sysroot lookup
 //!   zig/deps.zig        third-party C and C++ libraries
 //!   zig/protobuf.zig    protobuf-lite, Abseil, and generated game messages
-//!   zig/mod.zig         IL2CPP and Unity libraries, the mod, and platform entry points
+//!   zig/mod.zig         IL2CPP and Unity libraries, the mod, platform entry points, macos-universal
 //!   zig/launcher.zig    the Swift launcher app
 //!   zig/tests.zig       native fixtures and the dependency smoke test
 //!   zig/tools/          host programs the build runs
@@ -35,6 +35,7 @@ pub fn build(b: *std.Build) void {
     });
     const optimize = b.standardOptimizeOption(.{});
     const options = Options.parse(b);
+    mod.addUniversal(b, optimize, options);
     const ctx = Ctx.init(b, target, optimize, options);
 
     // Libraries the native fixtures share with the shipped mod. None of them need networking or a platform SDK,
