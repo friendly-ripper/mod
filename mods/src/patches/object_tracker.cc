@@ -2,12 +2,13 @@
 
 #include "patches/patches.h"
 
-#include <prime/chat.h>
-#include <prime/fleet.h>
-#include <prime/inventory.h>
-#include <prime/navigation.h>
-#include <prime/ui.h>
-#include <prime/viewers.h>
+#include "prime/chat.h"
+#include "prime/fleet.h"
+#include "prime/inventory.h"
+#include "prime/officers.h"
+#include "prime/navigation.h"
+#include "prime/ui.h"
+#include "prime/viewers.h"
 
 #include <EASTL/unordered_set.h>
 #include <EASTL/vector.h>
@@ -156,7 +157,7 @@ template <typename T> void TrackObject()
 }
 } // namespace
 
-void InstallObjectTrackers()
+void InstallObjectTracker()
 {
   TrackObject<PreScanTargetWidget>();
   TrackObject<FleetBarViewController>();

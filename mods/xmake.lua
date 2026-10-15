@@ -56,7 +56,7 @@ do
         end
 
         local assets = path.join(target:scriptdir(), "../assets")
-        local outdir  = path.join(target:scriptdir(), "src/patches/parts")
+        local outdir  = path.join(target:scriptdir(), "src/features")
 
         local loading = get_config("bg_image")
         if not loading or loading == "" then

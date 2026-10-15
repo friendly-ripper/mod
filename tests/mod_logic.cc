@@ -49,34 +49,34 @@ void ShipHints()
   Shortcut::Clear();
   // A locked dock F leaves native G at the sixth selectable position (the reported 1,2,3,4,5,7 layout).
   const std::array gapped_fleets{0, 1, 2, 3, 4, 6};
-  auto             ship_hint = [&](GameFunction action) {
+  auto             ship_hint = [&](Action action) {
     return ShipShortcutHintAction(action, gapped_fleets.size(), [&](std::size_t i) { return gapped_fleets[i]; });
   };
-  Check(ship_hint(GameFunction::SelectShip7) == GameFunction::SelectShip6,
+  Check(ship_hint(Action::SelectShip7) == Action::SelectShip6,
         "Native ship G must advertise the sixth mod shortcut when dock F is locked");
-  Check(ship_hint(GameFunction::SelectShip5) == GameFunction::SelectShip5, "Earlier ship hints must stay unchanged");
-  Check(ship_hint(GameFunction::SelectShip6) == GameFunction::Max, "Missing dock must not advertise a shortcut");
-  Check(ship_hint(GameFunction::ShowGalaxy) == GameFunction::ShowGalaxy, "Non-ship hint mapping changed");
-  Check(ShipShortcutHintAction(GameFunction::SelectShip1, 0, [](std::size_t) { return 0; }) == GameFunction::Max,
+  Check(ship_hint(Action::SelectShip5) == Action::SelectShip5, "Earlier ship hints must stay unchanged");
+  Check(ship_hint(Action::SelectShip6) == Action::Max, "Missing dock must not advertise a shortcut");
+  Check(ship_hint(Action::ShowGalaxy) == Action::ShowGalaxy, "Non-ship hint mapping changed");
+  Check(ShipShortcutHintAction(Action::SelectShip1, 0, [](std::size_t) { return 0; }) == Action::Max,
         "Unavailable fleet context must not advertise a guessed ship shortcut");
   for (int index = 0; index < 8; ++index) {
-    auto action = static_cast<GameFunction>(GameFunction::SelectShip1 + index);
+    auto action = static_cast<Action>(static_cast<int>(Action::SelectShip1) + index);
     Check(ShipShortcutHintAction(action, 8, [](std::size_t i) { return static_cast<int>(i); }) == action,
           "Contiguous eight-dock hints must keep their original shortcuts");
   }
   const std::array reordered_fleets{7, 0, 2, -1, 6, 4, 1, 3, 5};
-  auto             reordered_hint = [&](GameFunction action) {
+  auto             reordered_hint = [&](Action action) {
     return ShipShortcutHintAction(action, reordered_fleets.size(), [&](std::size_t i) { return reordered_fleets[i]; });
   };
-  Check(reordered_hint(GameFunction::SelectShip8) == GameFunction::SelectShip1, "Ship hints must follow bar order");
-  Check(reordered_hint(GameFunction::SelectShip7) == GameFunction::SelectShip5,
+  Check(reordered_hint(Action::SelectShip8) == Action::SelectShip1, "Ship hints must follow bar order");
+  Check(reordered_hint(Action::SelectShip7) == Action::SelectShip5,
         "Null fleet entries must preserve the positions passed to RequestSelect");
-  Check(reordered_hint(GameFunction::SelectShip6) == GameFunction::Max,
+  Check(reordered_hint(Action::SelectShip6) == Action::Max,
         "Fleet beyond the eight supported mod shortcuts must not advertise a shortcut");
-  Check(Shortcut::Hint(ship_hint(GameFunction::SelectShip7)).empty(),
+  Check(Shortcut::Hint(ship_hint(Action::SelectShip7)).empty(),
         "Unbound ship selection must not advertise a working shortcut");
-  Shortcut::Bind(GameFunction::SelectShip6, KeyChord::Parse("CTRL-F8"));
-  Check(Shortcut::Hint(ship_hint(GameFunction::SelectShip7)) == "^F8",
+  Shortcut::Bind(Action::SelectShip6, KeyChord::Parse("CTRL-F8"));
+  Check(Shortcut::Hint(ship_hint(Action::SelectShip7)) == "^F8",
         "Gapped ship hint must use the actual custom binding, not a hardcoded number");
 }
 
@@ -154,29 +154,29 @@ void Loading()
     quit = 42
     set_hotkeys_disble = "F3"
   )");
-  Check(Shortcut::Describe(GameFunction::ShowGalaxy) == "CTRL-G | F8", "both alternatives bound");
-  Check(Shortcut::Hint(GameFunction::ShowGalaxy) == "^G", "badge shows the first alternative");
+  Check(Shortcut::Describe(Action::ShowGalaxy) == "CTRL-G | F8", "both alternatives bound");
+  Check(Shortcut::Hint(Action::ShowGalaxy) == "^G", "badge shows the first alternative");
   Check(Value(parsed, "shortcuts", "show_galaxy") == "CTRL-G | F8", "vars records the bindings");
   Check(Value(parsed, "shortcuts_source", "show_galaxy") == "config", "source is the settings file");
 
-  Check(!Shortcut::HasBinding(GameFunction::ShowSystem), "an empty string disables the binding");
+  Check(!Shortcut::HasBinding(Action::ShowSystem), "an empty string disables the binding");
   Check(Value(parsed, "shortcuts", "show_system") == "NONE", "disabled binding recorded as NONE");
 
-  Check(Shortcut::Describe(GameFunction::ShowEvents) == std::string("SHIFT-E"),
+  Check(Shortcut::Describe(Action::ShowEvents) == std::string("SHIFT-E"),
         "a binding with no valid key falls back to the default");
   Check(Value(parsed, "shortcuts_source", "show_events") == "default", "fallback recorded as default");
-  Check(Shortcut::Describe(GameFunction::Quit) == std::string("F10"), "a non-string falls back too");
+  Check(Shortcut::Describe(Action::Quit) == std::string("F10"), "a non-string falls back too");
 
-  Check(Shortcut::Describe(GameFunction::DisableHotKeys) == "F3", "deprecated alias still binds");
+  Check(Shortcut::Describe(Action::DisableHotKeys) == "F3", "deprecated alias still binds");
   Check(Value(parsed, "shortcuts_source", "set_hotkeys_disabled") == "alias:set_hotkeys_disble", "alias source");
 
-  Check(Shortcut::HasBinding(GameFunction::ShowBookmarks), "extended shortcuts load when extended");
-  Shortcut::Bind(GameFunction::Quit, KeyChord::Parse("F1"));
+  Check(Shortcut::HasBinding(Action::ShowBookmarks), "extended shortcuts load when extended");
+  Shortcut::Bind(Action::Quit, KeyChord::Parse("F1"));
   Shortcut::Load(toml::table{}, parsed, true, false);
-  Check(Shortcut::Describe(GameFunction::Quit) == "F10", "loading again replaces earlier bindings");
-  Check(!Shortcut::HasBinding(GameFunction::ShowLookup), "experimental shortcuts need experimental");
+  Check(Shortcut::Describe(Action::Quit) == "F10", "loading again replaces earlier bindings");
+  Check(!Shortcut::HasBinding(Action::ShowLookup), "experimental shortcuts need experimental");
   parsed = Load("", false);
-  Check(!Shortcut::HasBinding(GameFunction::ShowBookmarks), "extended shortcuts are skipped otherwise");
+  Check(!Shortcut::HasBinding(Action::ShowBookmarks), "extended shortcuts are skipped otherwise");
   Check(Value(parsed, "shortcuts", "show_bookmarks") == "<missing>", "skipped shortcuts are not recorded");
 }
 
@@ -185,31 +185,31 @@ void Matching()
   Load(""); // defaults: move_down = "S|DOWN", toggle_shortcut_hints = "HOME"
 
   Hold({KeyCode::DownArrow});
-  Check(Shortcut::IsPressed(GameFunction::MoveDown), "default movement key");
+  Check(Shortcut::IsPressed(Action::MoveDown), "default movement key");
   for (auto modifier : {KeyCode::LeftControl, KeyCode::RightShift, KeyCode::LeftAlt, KeyCode::LeftCommand}) {
     Hold({KeyCode::DownArrow, modifier});
-    Check(!Shortcut::IsPressed(GameFunction::MoveDown), "a modified chord must not trigger the plain binding");
+    Check(!Shortcut::IsPressed(Action::MoveDown), "a modified chord must not trigger the plain binding");
   }
   Hold({});
-  Check(!Shortcut::IsPressed(GameFunction::MoveDown), "released key");
+  Check(!Shortcut::IsPressed(Action::MoveDown), "released key");
 
   // Releasing the modifier first must not turn a held CTRL-PGUP into PGUP.
   Load(""); // ui_scaleup = "PGUP", ui_scaleshipup = "CTRL-PGUP"
   Hold({KeyCode::LeftControl, KeyCode::PageUp});
-  Check(Shortcut::IsPressed(GameFunction::UiShipScaleUp), "modified chord");
-  Check(!Shortcut::IsPressed(GameFunction::UiScaleUp), "plain chord blocked while modified");
+  Check(Shortcut::IsPressed(Action::UiShipScaleUp), "modified chord");
+  Check(!Shortcut::IsPressed(Action::UiScaleUp), "plain chord blocked while modified");
   Check(Shortcut::Owns(KeyCode::PageUp), "the modified chord owns its key");
   Hold({KeyCode::PageUp});
-  Check(!Shortcut::IsPressed(GameFunction::UiScaleUp), "plain chord waits for the key's release");
+  Check(!Shortcut::IsPressed(Action::UiScaleUp), "plain chord waits for the key's release");
   Hold({});
   Check(!Shortcut::Owns(KeyCode::PageUp), "releasing the key frees it");
   Hold({KeyCode::PageUp});
-  Check(Shortcut::IsPressed(GameFunction::UiScaleUp), "plain chord after a release");
+  Check(Shortcut::IsPressed(Action::UiScaleUp), "plain chord after a release");
 
   // A modified movement binding keeps moving while its modifier is held.
-  Shortcut::Bind(GameFunction::MoveDown, KeyChord::Parse("CTRL-DOWN"));
+  Shortcut::Bind(Action::MoveDown, KeyChord::Parse("CTRL-DOWN"));
   Hold({KeyCode::LeftControl, KeyCode::DownArrow});
-  Check(Shortcut::IsDown(GameFunction::MoveDown) && Shortcut::IsDown(GameFunction::MoveDown),
+  Check(Shortcut::IsDown(Action::MoveDown) && Shortcut::IsDown(Action::MoveDown),
         "explicit movement chord keeps matching");
   held.fill(false);
 }

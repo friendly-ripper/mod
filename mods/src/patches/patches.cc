@@ -1,3 +1,4 @@
+#include "mod.h"
 #include "patches/patches.h"
 
 #include "config.h"
@@ -25,65 +26,64 @@
 
 namespace
 {
-struct Patch {
+struct Feature {
   const char* name;
   void (*install)();
-  bool (*enabled)(const Config&);
+  // The [patches] hook group that installs it; null for the few that always install.
+  bool Config::Patches::* group;
 };
 
 // Installed in this order; the log numbers them. Only the [patches] hook groups decide what is installed, so users
 // can avoid clashing with other mods. Feature settings are read inside the hooks, which keeps every feature
 // switchable at runtime; a hook whose feature is off must return early and cheaply.
-constexpr Patch kPatches[] = {
-    {"interiorzoomhooks", InstallInteriorZoomHooks, [](const Config& c) { return c.patches.interiorzoomhooks; }},
-    {"chattitledisplayhooks", InstallChatTitleDisplayHooks, [](const Config& c) { return c.patches.chattitledisplayhooks; }},
-    {"revealconfirmhooks", InstallRevealConfirmationHooks, [](const Config& c) { return c.patches.revealconfirmhooks; }},
-    {"actionqueuerecoveryhooks", InstallActionQueueRecovery, [](const Config& c) { return c.patches.actionqueuerecoveryhooks; }},
-    {"queueaddressguardhooks", InstallQueueAddressGuard, [](const Config& c) { return c.patches.queueaddressguardhooks; }},
-    {"thinqueueprotectionhooks", InstallThinQueueProtection, [](const Config& c) { return c.patches.thinqueueprotectionhooks; }},
-    {"pinnedshipclicktoggle", InstallPinnedShipClickHooks, [](const Config& c) { return c.patches.pinnedshipclicktoggle; }},
+constexpr Feature kFeatures[] = {
+    {"interiorzoomhooks", InstallInteriorZoomHooks, &Config::Patches::interiorzoomhooks},
+    {"chattitledisplayhooks", InstallChatTitleDisplayHooks, &Config::Patches::chattitledisplayhooks},
+    {"revealconfirmhooks", InstallRevealConfirmationHooks, &Config::Patches::revealconfirmhooks},
+    {"actionqueuerecoveryhooks", InstallActionQueueRecovery, &Config::Patches::actionqueuerecoveryhooks},
+    {"queueaddressguardhooks", InstallQueueAddressGuard, &Config::Patches::queueaddressguardhooks},
+    {"thinqueueprotectionhooks", InstallThinQueueProtection, &Config::Patches::thinqueueprotectionhooks},
+    {"pinnedshipclicktoggle", InstallPinnedShipClickHooks, &Config::Patches::pinnedshipclicktoggle},
 
-    {"HavenZoomHooks", InstallHavenZoomHooks, [](const Config& c) { return c.patches.havenzoomhooks; }},
-    {"HavenHistory", InstallHavenHistoryHooks, [](const Config& c) { return c.patches.havenhistoryhooks; }},
-    {"UiScaleHooks", InstallUiScaleHooks, [](const Config& c) { return c.patches.uiscalehooks; }},
-    {"ZoomHooks", InstallZoomHooks, [](const Config& c) { return c.patches.zoomhooks; }},
-    {"BuffFixHooks", InstallBuffFixHooks, [](const Config& c) { return c.patches.bufffixhooks; }},
-    {"ToastBannerHooks", InstallToastBannerHooks, [](const Config& c) { return c.patches.toastbannerhooks; }},
-    {"PanHooks", InstallPanHooks, [](const Config& c) { return c.patches.panhooks; }},
-    {"HotkeyHooks", InstallHotkeyHooks, [](const Config& c) { return c.patches.hotkeyhooks; }},
-    {"GiftsBulkClaimHooks", InstallGiftsBulkClaimHooks, [](const Config& c) { return c.patches.giftsbulkclaimhooks; }},
-    {"DailyFactionBulkClaimHooks", InstallDailyFactionBulkClaimHooks,
-     [](const Config& c) { return c.patches.dailyfactionbulkclaimhooks; }},
+    {"HavenZoom", InstallHavenZoomHooks, &Config::Patches::havenzoomhooks},
+    {"HavenHistory", InstallHavenHistoryHooks, &Config::Patches::havenhistoryhooks},
+    {"UiScale", InstallUiScale, &Config::Patches::uiscalehooks},
+    {"Zoom", InstallZoom, &Config::Patches::zoomhooks},
+    {"FleetLabels", InstallFleetLabels, &Config::Patches::zoomhooks},
+    {"Pan", InstallPan, &Config::Patches::panhooks},
+    {"OutOfDockPower", InstallOutOfDockPower, &Config::Patches::bufffixhooks},
+    {"BuffCrashGuard", InstallBuffCrashGuard, &Config::Patches::tempcrashfixes},
+    {"Toasts", InstallToasts, &Config::Patches::toastbannerhooks},
+    {"Hotkeys", InstallHotkeys, &Config::Patches::hotkeyhooks},
+    {"GiftsAutoOpen", InstallGiftsAutoOpen, &Config::Patches::giftsbulkclaimhooks},
+    {"DailyClaimFilter", InstallDailyClaimFilter, &Config::Patches::dailyfactionbulkclaimhooks},
 #if _WIN32
-    {"FreeResizeHooks", InstallFreeResizeHooks, [](const Config& c) { return c.patches.freeresizehooks; }},
+    {"FreeResize", InstallFreeResize, &Config::Patches::freeresizehooks},
+    {"Cursor", InstallCursor, &Config::Patches::testpatches},
 #endif
-    {"TempCrashFixes", InstallTempCrashFixes, [](const Config& c) { return c.patches.tempcrashfixes; }},
-    {"TestPatches", InstallTestPatches, [](const Config& c) { return c.patches.testpatches; }},
-    {"MiscPatches", InstallMiscPatches, [](const Config& c) { return c.patches.miscpatches; }},
-    {"MissionHudTweaksHooks", InstallMissionHudTweaksHooks,
-     [](const Config& c) { return c.patches.missionhudtweakshooks; }},
-    {"ArtifactExchangeHooks", InstallArtifactExchangeHooks,
-     [](const Config& c) { return c.patches.artifactexchangehooks; }},
-    {"ChatPatches", InstallChatPatches, [](const Config& c) { return c.patches.chatpatches; }},
-    {"SyncPatches", InstallSyncPatches, [](const Config& c) { return c.patches.syncpatches; }},
-    {"ObjectTracker", InstallObjectTrackers, [](const Config& c) { return c.patches.objecttracker; }},
-    {"LoadingScreen", InstallLoadingScreenHooks, [](const Config& c) { return c.patches.loadingscreenhooks; }},
-    {"TransitionScreen", InstallTransitionScreenHooks, [](const Config& c) { return c.patches.transitionscreenhooks; }},
-    {"GalacticAnomalyTimer", InstallGalacticAnomalyTimer,
-     [](const Config& c) { return c.patches.galacticanomalytimerhooks; }},
-    {"LoadingTip", InstallLoadingTipHooks, [](const Config& c) { return c.patches.loadingtiphooks; }},
-    {"InstantCargoCounter", InstallInstantCargoCounterHooks,
-     [](const Config& c) { return c.patches.instantcargocounterhooks; }},
-    {"CargoFormat", InstallCargoFormatHooks, [](const Config& c) { return c.patches.cargoformathooks; }},
-    {"OfficerSortHooks", InstallOfficerSortHooks, [](const Config& c) { return c.patches.officersorthooks; }},
-    {"PinnedShipSort", InstallPinnedShipSortHooks, [](const Config& c) { return c.patches.pinnedshiphooks; }},
-    {"DoubleClickAssignShip", InstallDoubleClickAssignShipHooks,
-     [](const Config& c) { return c.patches.doubleclickassignshiphooks; }},
-    {"InstantWarpConfirm", InstallInstantWarpConfirmationHooks, [](const Config&) { return true; }},
-    {"ForbiddenTechConfirm", InstallForbiddenTechConfirmationHooks,
-     [](const Config& c) { return c.patches.forbiddentechconfirmhooks; }},
-    {"AudioEvents", InstallAudioEventHooks, [](const Config& c) { return c.patches.audioeventhooks; }},
-    {"SettingsReload", InstallSettingsReload, [](const Config&) { return true; }},
+    {"SkipRevealSequence", InstallSkipRevealSequence, &Config::Patches::tempcrashfixes},
+    {"GameConfigOverrides", InstallGameConfigOverrides, &Config::Patches::testpatches},
+    {"QueueSwitch", InstallQueueSwitch, &Config::Patches::testpatches},
+    {"ShopLimits", InstallShopLimits, &Config::Patches::miscpatches},
+    {"MissionHud", InstallMissionHud, &Config::Patches::missionhudtweakshooks},
+    {"ArtifactExchange", InstallArtifactExchange, &Config::Patches::artifactexchangehooks},
+    {"Chat", InstallChat, &Config::Patches::chatpatches},
+    {"Sync", InstallSync, &Config::Patches::syncpatches},
+    {"ObjectTracker", InstallObjectTracker, &Config::Patches::objecttracker},
+    {"LoginScreen", InstallLoginScreen, &Config::Patches::loadingscreenhooks},
+    {"TransitionScreen", InstallTransitionScreen, &Config::Patches::transitionscreenhooks},
+    {"AnomalyTimer", InstallAnomalyTimer, &Config::Patches::galacticanomalytimerhooks},
+    {"LoadingTips", InstallLoadingTips, &Config::Patches::loadingtiphooks},
+    {"InstantCargo", InstallInstantCargo, &Config::Patches::instantcargocounterhooks},
+    {"CargoFormat", InstallCargoFormat, &Config::Patches::cargoformathooks},
+    {"OfficerSort", InstallOfficerSort, &Config::Patches::officersorthooks},
+    {"PinnedShips", InstallPinnedShips, &Config::Patches::pinnedshiphooks},
+    {"DoubleClickAssign", InstallDoubleClickAssign, &Config::Patches::doubleclickassignshiphooks},
+    {"InstantWarp", InstallInstantWarp, nullptr},
+    {"ForbiddenTechConfirm", InstallForbiddenTechConfirm, &Config::Patches::forbiddentechconfirmhooks},
+    {"Audio", InstallAudio, &Config::Patches::audioeventhooks},
+    // Watching the settings file only needs the frame tick.
+    {"SettingsReload", [] { InstallFrameTick(); }, nullptr},
 };
 
 void StartLogging()
@@ -170,16 +170,17 @@ int64_t il2cpp_init_hook(auto original, const char* domain_name)
     return result;
 
   spdlog::info("Initializing code hooks:");
-  for (size_t i = 0; i < std::size(kPatches); ++i) {
-    const auto& patch   = kPatches[i];
-    const bool  enabled = patch.enabled(*config);
-    spdlog::info(" {} {:>2} of {} ({})", enabled ? "+ Patching" : "x Skipping", i + 1, std::size(kPatches), patch.name);
+  for (size_t i = 0; i < std::size(kFeatures); ++i) {
+    const auto& feature = kFeatures[i];
+    const bool  enabled = !feature.group || config->patches.*feature.group;
+    spdlog::info(" {} {:>2} of {} ({})", enabled ? "+ Patching" : "x Skipping", i + 1, std::size(kFeatures),
+                 feature.name);
     if (!enabled)
       continue;
     try {
-      patch.install();
+      feature.install();
     } catch (const std::exception& error) {
-      spdlog::error("{} failed to install: {}", patch.name, error.what());
+      spdlog::error("{} failed to install: {}", feature.name, error.what());
     }
   }
 
@@ -197,7 +198,7 @@ int64_t il2cpp_init_hook(auto original, const char* domain_name)
 }
 } // namespace
 
-void ApplyPatches()
+void StartMod()
 {
 #if _WIN32
   auto assembly = LoadLibraryA("GameAssembly.dll");

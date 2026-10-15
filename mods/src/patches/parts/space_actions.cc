@@ -1,5 +1,6 @@
-// Acting on the selected fleet and the target viewers in space: engage, scan, mine, queue, warp, recall and repair
-// from the keyboard, dismissing viewers with Escape, and opening a target's cargo when it is scanned.
+// The selected fleet and the target viewers in space: selecting ships with the number keys, engaging, scanning,
+// mining, queueing, warping, recalling and repairing from the keyboard, dismissing viewers with Escape, opening a
+// target's cargo when it is scanned, and the action queue switch.
 
 #include "config.h"
 #include "patches/input.h"
@@ -7,16 +8,17 @@
 #include "patches/patches.h"
 #include "patches/shortcuts.h"
 
-#include <prime/Hub.h>
-#include <prime/fleet.h>
-#include <prime/navigation.h>
-#include <prime/ui.h>
-#include <prime/viewers.h>
+#include "prime/Hub.h"
+#include "prime/fleet.h"
+#include "prime/navigation.h"
+#include "prime/ui.h"
+#include "prime/viewers.h"
 
 #include <spdlog/spdlog.h>
 #include <spud/detour.h>
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
 #include <span>
 #include <utility>
@@ -112,12 +114,6 @@ bool ArmadaViewerShown(ArmadaObjectViewerWidget* armada)
   return state == VisibilityState::Visible || state == VisibilityState::Show;
 }
 
-void PressListenerButton(SemaphoreButtonListener* listener)
-{
-  if (auto* button = listener ? listener->TheButton() : nullptr)
-    button->Press();
-}
-
 // Requests `type` on the selected fleet when it is in one of `states`. With `help_state`, a fleet in that state
 // (or one the action was just requested for) also asks its alliance for help.
 bool RequestFleetAction(FleetBarViewController* fleet_bar, ActionType type, std::span<const FleetState> states,
@@ -197,7 +193,8 @@ bool ActOnPreScan(PreScanTargetWidget* pre_scan, const Pressed& pressed, FleetPl
       if (type != HullType::ArmadaTarget) {
         buttons->OnEngageButtonClicked();
       } else if (auto* attack = pre_scan->armadaAttackButton(); attack && attack->isActiveAndEnabled()) {
-        PressListenerButton(attack->SemaphoreListener());
+        if (auto* button = attack->TheButton())
+          button->Press();
       } else {
         buttons->OnArmadaButtonClicked();
       }
@@ -365,12 +362,79 @@ void PreScanTargetWidget_ShowWithFleet_Hook(auto original, PreScanTargetWidget* 
   if (_this)
     ShowCargoByDefault(_this->rewardsButtonWidget());
 }
+
+// queue_enabled switches the game's action queue off by telling it the queue is locked.
+bool ActionQueueManager_IsQueueUnlocked_Hook(auto original, ActionQueueManager* _this)
+{ return Config::Get().control.queue_enabled && original(_this); }
+
+void ViewSelectedFleet(FleetPlayerData* fleet)
+{
+  NavigationSectionManager::HideInteraction();
+  if (auto* fleets = FleetsManager::Instance())
+    fleets->RequestViewFleet(fleet, true);
+}
 } // namespace
 
 bool TargetViewerShown()
 { return TargetViewers::AnyShown(); }
 
-bool SpaceActionsUpdate()
+bool SelectShipShortcuts()
+{
+  using Clock = std::chrono::steady_clock;
+  // The number keys select a ship in the fleet bar; pressing the same one again within select_timer flies the
+  // camera to it. With disable_preview_locate, the second press only selects while a target card is open.
+  constexpr Action kShips[]   = {Action::SelectShip1, Action::SelectShip2, Action::SelectShip3, Action::SelectShip4,
+                                 Action::SelectShip5, Action::SelectShip6, Action::SelectShip7, Action::SelectShip8};
+  static auto      last_press = Clock::now();
+  static int32_t   last_index = -1;
+
+  int32_t index = 0;
+  while (index < 8 && !Shortcut::IsDown(kShips[index]))
+    ++index;
+  // TODO: Shift+ship used to request a tow by the Discovery. Its bindings had drifted, so it never ran on
+  // recent clients, and it was disabled until someone verifies it in game. Shift+ship does nothing meanwhile.
+  if (index == 8 || Key::IsInputFocused())
+    return false;
+
+  auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+  if (!fleet_bar)
+    return false;
+
+  const auto now        = Clock::now();
+  const bool can_locate = !Config::Get().ui.disable_preview_locate || !TargetViewerShown();
+  if (can_locate && index == last_index && fleet_bar->IsIndexSelected(index)
+      && now - last_press < std::chrono::milliseconds(Config::Get().control.select_timer)) {
+    auto* fleet = fleet_bar->SelectedFleet();
+    if (!fleet)
+      return true;
+    ViewSelectedFleet(fleet);
+  } else {
+    fleet_bar->RequestSelect(index);
+  }
+  last_index = index;
+  last_press = now;
+  return true;
+}
+
+bool FleetShortcuts()
+{
+  if (Shortcut::IsDown(Action::SelectCurrent)) {
+    auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+    if (auto* fleet = fleet_bar ? fleet_bar->SelectedFleet() : nullptr) {
+      ViewSelectedFleet(fleet);
+      return true;
+    }
+  }
+  if (Shortcut::IsDown(Action::ToggleQueue)) {
+    auto& queue_enabled = Config::Get().control.queue_enabled;
+    queue_enabled       = !queue_enabled;
+    ResetQueueRecoveryTracking();
+    return true;
+  }
+  return false;
+}
+
+bool FleetActionShortcuts()
 {
   // A replay lives for exactly the next frame, whatever that frame does.
   const auto replayed = std::exchange(replay, std::nullopt);
@@ -382,7 +446,7 @@ bool SpaceActionsUpdate()
 
   // Escape or the primary action dismisses the golden rewards screen. Down, not Pressed: a held Escape would go
   // back a section every frame while the screen closes.
-  if (Shortcut::IsDown(GameFunction::ActionPrimary) || Key::Down(KeyCode::Escape)) {
+  if (Shortcut::IsDown(Action::ActionPrimary) || Key::Down(KeyCode::Escape)) {
     if (auto* rewards = ObjectFinder<AnimatedRewardsScreenViewController>::Get(); rewards && rewards->IsActive()) {
       rewards->GoBackToLastSection();
       return true;
@@ -390,15 +454,15 @@ bool SpaceActionsUpdate()
   }
 
   Pressed pressed{
-      .primary     = Shortcut::IsDown(GameFunction::ActionPrimary),
-      .secondary   = Shortcut::IsDown(GameFunction::ActionSecondary),
-      .queue       = Shortcut::IsDown(GameFunction::ActionQueue),
-      .queue_clear = Shortcut::IsDown(GameFunction::ActionQueueClear),
+      .primary     = Shortcut::IsDown(Action::ActionPrimary),
+      .secondary   = Shortcut::IsDown(Action::ActionSecondary),
+      .queue       = Shortcut::IsDown(Action::ActionQueue),
+      .queue_clear = Shortcut::IsDown(Action::ActionQueueClear),
       // With disable_preview_recall, recall only works while no target card is open.
-      .recall        = Shortcut::IsDown(GameFunction::ActionRecall)
+      .recall        = Shortcut::IsDown(Action::ActionRecall)
                        && (!Config::Get().ui.disable_preview_recall || !TargetViewerShown()),
-      .recall_cancel = Shortcut::IsDown(GameFunction::ActionRecallCancel),
-      .repair        = Shortcut::IsDown(GameFunction::ActionRepair),
+      .recall_cancel = Shortcut::IsDown(Action::ActionRecallCancel),
+      .repair        = Shortcut::IsDown(Action::ActionRepair),
   };
   if (replayed && !pressed.Any()) {
     pressed       = *replayed;
@@ -408,14 +472,20 @@ bool SpaceActionsUpdate()
     if (auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get())
       ActOnSelectedFleet(fleet_bar, pressed);
 
-  if (Shortcut::IsDown(GameFunction::ActionView))
+  if (Shortcut::IsDown(Action::ActionView))
     ToggleTargetCargo();
   if (show_cargo_frames > 0)
     ShowPendingTargetCargo();
   return false;
 }
 
-void InstallSpaceActionHooks()
+void InstallQueueSwitch()
+{
+  if (auto m = ActionQueueManager::Class::Method("IsQueueUnlocked"))
+    SPUD_STATIC_DETOUR(m.Pointer(), ActionQueueManager_IsQueueUnlocked_Hook);
+}
+
+void InstallFleetActions()
 {
   if (auto m = RewardsButtonWidget::Class::Method("OnDidBindContext"))
     SPUD_STATIC_DETOUR(m.Pointer(), RewardsButtonWidget_OnDidBindContext_Hook);

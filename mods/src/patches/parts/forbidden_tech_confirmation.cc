@@ -3,6 +3,8 @@
 #include "config.h"
 #include "patches/patches.h"
 
+#include "prime/ui.h"
+
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
 #include <spud/detour.h>
@@ -11,18 +13,6 @@
 
 namespace
 {
-constexpr int32_t kConfirm = 1;
-constexpr int32_t kYes     = 3;
-
-using MessageBox = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "MessageBox">;
-
-struct MessageBoxContext : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "MessageBoxContext">;
-
-  // Action<MessageBox.ButtonResult>
-  Il2CppDelegate* OnSelection()
-  { return Field<"OnSelection", Il2CppDelegate*>(); }
-};
 
 bool IsForbiddenTechConfirmation(const Il2CppDelegate* callback)
 {
@@ -58,11 +48,11 @@ bool ConfirmForbiddenTechUpgrade(Il2CppDelegate* callback)
 
   // The closure was identified above, so call its method directly. If it throws, show the dialog
   // instead so the upgrade is never lost silently.
-  using Closure = void (*)(Il2CppObject*, int32_t, const MethodInfo*);
+  using Closure = void (*)(Il2CppObject*, MessageBoxResult, const MethodInfo*);
   if (callback->method->parameters_count != 1)
     return false;
   try {
-    reinterpret_cast<Closure>(callback->method->methodPointer)(callback->target, kConfirm, callback->method);
+    reinterpret_cast<Closure>(callback->method->methodPointer)(callback->target, MessageBoxResult::Confirm, callback->method);
   } catch (...) {
     spdlog::warn("ForbiddenTechConfirmation: confirmation callback threw; showing the dialog");
     return false;
@@ -76,7 +66,7 @@ bool ConfirmAllianceContribution(Il2CppDelegate* callback)
     return false;
   }
 
-  int32_t          result    = kYes;
+  int32_t          result    = 3;
   void*            args[]    = {&result};
   Il2CppException* exception = nullptr;
   il2cpp_runtime_invoke(callback->method, callback->target, args, &exception);
@@ -105,10 +95,10 @@ void MessageBox_ShowWithCallback_Hook(auto original, MessageBoxContext* context,
 }
 } // namespace
 
-void InstallForbiddenTechConfirmationHooks()
+void InstallForbiddenTechConfirm()
 {
-  if (auto m = MessageBox::Method("Show", 1))
+  if (auto m = GameMessageBox::Method("Show", 1))
     SPUD_STATIC_DETOUR(m.Pointer(), MessageBox_Show_Hook);
-  if (auto m = MessageBox::Method("Show", 2))
+  if (auto m = GameMessageBox::Method("Show", 2))
     SPUD_STATIC_DETOUR(m.Pointer(), MessageBox_ShowWithCallback_Hook);
 }

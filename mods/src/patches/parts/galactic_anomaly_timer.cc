@@ -4,8 +4,9 @@
 #include "config.h"
 #include "patches/patches.h"
 
-#include <prime/ui.h>
-#include <prime/unity.h>
+#include "prime/hud.h"
+#include "prime/ui.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -16,53 +17,6 @@
 
 namespace
 {
-struct TimeSpan {
-  int64_t ticks;
-};
-
-struct FactionInformation : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "FactionInformation">;
-
-  // TextLocalizer components, one per system name label.
-  il2cpp::List<Component*>* systemName()
-  { return Field<"_systemName", il2cpp::List<Component*>*>(); }
-};
-
-struct HudNavigationViewController : Component {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation.UI", "HudNavigationViewController">;
-
-  Component* galacticAnomaliesButtonWidget()
-  { return Field<"_galacticAnomaliesButtonWidget", Component*>(); }
-  FactionInformation* factionInformationHelper()
-  { return Field<"_factionInformationHelper", FactionInformation*>(); }
-  bool isActiveAndEnabled()
-  { return Get<"isActiveAndEnabled", bool>(); }
-  bool CanShowGalacticAnomaly()
-  { return Call<"CanShowGalacticAnomaly", bool>(); }
-  // NavigationViewData. It and the server models below are read on their runtime classes.
-  il2cpp::Object* CanvasContext()
-  { return Get<"CanvasContext", il2cpp::Object*>(); }
-};
-
-struct HudAllianceAndNewsViewController : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "HudAllianceAndNewsViewController">;
-
-  Component* chestPromotion()
-  { return Field<"_chestPromotion", Component*>(); }
-};
-
-struct GalacticAnomaliesManager : MonoSingleton<GalacticAnomaliesManager> {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.GalacticAnomalies", "GalacticAnomaliesManager">;
-
-  // Instance is only read once the singleton is up, so a missing manager never triggers the game's own search.
-  static GalacticAnomaliesManager* Current()
-  { return Class::Get<"Initialized", bool>() ? Instance() : nullptr; }
-
-  // Digit.PrimeServer.Models.GalacticAnomaly, or null.
-  il2cpp::Object* GetSystemGalacticAnomalies(int64_t system)
-  { return Call<"GetSystemGalacticAnomalies", il2cpp::Object*>(system); }
-};
-
 using Clock = std::chrono::steady_clock;
 
 // Creates an inactive GameObject with a RectTransform under `parent`. `root` keeps it alive until the caller is
@@ -96,7 +50,7 @@ Sprite* NativeBackgroundSprite(HudNavigationViewController* nav)
   return sprite ? sprite : image->sprite();
 }
 
-Image* AddImage(GameObject* object, color tint, Sprite* sprite)
+Image* AddImage(GameObject* object, Color tint, Sprite* sprite)
 {
   auto* image = object->AddComponent<Image>();
   if (!image)
@@ -192,14 +146,14 @@ private:
   static int64_t RemainingTicks(HudNavigationViewController* nav)
   {
     auto*   context = nav->CanvasContext();
-    auto*   address = context ? context->Get<"ViewingAddress", il2cpp::Object*>() : nullptr;
-    int64_t system  = address ? address->Get<"System", int64_t>() : -1;
+    auto*   address = context ? context->ViewingAddress() : nullptr;
+    int64_t system  = address ? address->System() : -1;
     auto*   manager = system > 0 ? GalacticAnomaliesManager::Current() : nullptr;
     auto*   anomaly = manager ? manager->GetSystemGalacticAnomalies(system) : nullptr;
-    if (!anomaly || !anomaly->Get<"IsActive", bool>())
+    if (!anomaly || !anomaly->IsActive())
       return 0;
-    auto* timer = anomaly->Get<"EndTimeTimerDataContext", il2cpp::Object*>();
-    return timer ? timer->Get<"RemainingTime", TimeSpan>().ticks : 0;
+    auto* timer = anomaly->EndTimeTimerDataContext();
+    return timer ? timer->RemainingTime().ticks : 0;
   }
 
   // Builds the panel: the native rounded sprite twice, with a narrow inset making the border, and a countdown in
@@ -267,16 +221,16 @@ private:
 AnomalyTimer* timer = nullptr;
 } // namespace
 
-void GalacticAnomalyTimerUpdate()
+void AnomalyTimerUpdate()
 {
   if (timer)
     timer->Update();
 }
 
-void InstallGalacticAnomalyTimer()
+void InstallAnomalyTimer()
 {
   // Never destroyed: GC handles must not be released by static destructors after the runtime is gone.
-  if (InstallScreenManagerUpdateHook())
+  if (InstallFrameTick())
     timer = new AnomalyTimer;
   if (timer)
     spdlog::info("Galactic anomaly countdown enabled (below Help All / Engage / Claim)");

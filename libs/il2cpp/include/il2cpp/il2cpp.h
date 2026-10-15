@@ -466,6 +466,8 @@ template <typename T> struct List : Object {
   { Call<"Add">(value); }
   void RemoveAt(int32_t index)
   { Call<"RemoveAt">(index); }
+  void Clear()
+  { Call<"Clear">(); }
 
   struct Iterator {
     List*   list;

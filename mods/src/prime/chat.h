@@ -2,8 +2,8 @@
 
 // Chat manager and chat view controllers.
 
-#include "ui.h"
-#include "unity.h"
+#include "prime/ui.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -40,12 +40,8 @@ struct ChatManager : MonoSingleton<ChatManager> {
   bool CanSeeRegionalChat()
   { return Call<"CanSeeRegionalChat", bool>(); }
 
-  bool IsSideChatAllowed()
-  { return Get<"IsSideChatAllowed", bool>(); }
   bool IsSideChatOpen()
   { return Get<"IsSideChatOpen", bool>(); }
-  ChatViewMode ViewMode()
-  { return Get<"ViewMode", ChatViewMode>(); }
   void SetViewMode(ChatViewMode value)
   { Set<"ViewMode">(value); }
 };
@@ -62,23 +58,13 @@ struct SwipeScroller : il2cpp::Object {
 struct ChatPreviewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Chat", "ChatPreviewController">;
 
-  // ImageSelector[]
-  il2cpp::Array<il2cpp::Object*>* panelIndicators()
-  { return Field<"_panelIndicators", il2cpp::Array<il2cpp::Object*>*>(); }
   SwipeScroller* swipeScroller()
   { return Field<"_swipeScroller", SwipeScroller*>(); }
   void SetFocusedPanel(ChatChannelCategory value)
   { SetField<"_focusedPanel">(value); }
 };
 
-struct ChatSectionContext : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Chat", "ChatSectionContext">;
-
-  ChatChannelCategory category()
-  { return Field<"_category", ChatChannelCategory>(); }
-};
-
-struct ChatMessageListLocalViewController : ViewController<ChatSectionContext> {
+struct ChatMessageListLocalViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Chat", "ChatMessageListLocalViewController">;
 
   TMP_InputField* inputField()

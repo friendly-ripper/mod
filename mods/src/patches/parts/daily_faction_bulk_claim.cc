@@ -1,11 +1,14 @@
-// daily_bulk_claim_factions and daily_bulk_claim_toggle_default_on: limits the missions screen's Claim All to the
-// chosen factions' dailies, shows only their icons next to the toggle, and can switch the toggle on.
+// Missions: the hud_* settings, which force mission HUD buttons always shown or never shown, and
+// daily_bulk_claim_factions and daily_bulk_claim_toggle_default_on, which limit the missions screen's Claim All to
+// the chosen factions' dailies, show only their icons next to the toggle, and can switch the toggle on.
 
 #include "config.h"
 #include "patches/patches.h"
 #include "str_utils.h"
 
-#include <prime/unity.h>
+#include "prime/hud.h"
+#include "prime/missions.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -16,48 +19,43 @@
 
 namespace
 {
-struct ResourceSpec : il2cpp::Object {
-  using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Models", "ResourceSpec">;
+// --- Mission HUD buttons ---
 
-  Il2CppString* resourceId()
-  { return Field<"resourceId_", Il2CppString*>(); }
+using ButtonGetter = Component* (*)(MissionsHudViewController*);
+
+template <il2cpp::Name Field> Component* Button(MissionsHudViewController* controller)
+{ return controller->ButtonField<Field>(); }
+
+struct ButtonSetting {
+  const char*  name; // the hud_<name> setting
+  ButtonGetter button;
 };
 
-struct InventoryItem : il2cpp::Object {
-  using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Models", "InventoryItem">;
-
-  ResourceSpec* resourceSpec()
-  { return Field<"_resourceSpec", ResourceSpec*>(); }
+constexpr ButtonSetting kButtons[] = {
+    {"q_trials", Button<"_challengesButton">}, {"field_training", Button<"_achievementsButton">},
+    {"outposts", Button<"_outpostsButton">},   {"daily_goals", Button<"_dailyGoalsButton">},
+    {"missions", Button<"_missionsButton">},
 };
 
-struct PointerEventData : il2cpp::Object {
-  using Class = il2cpp::Class<"UnityEngine.UI", "UnityEngine.EventSystems", "PointerEventData">;
-};
-
-struct Toggle : Component {
-  using Class = il2cpp::Class<"UnityEngine.UI", "UnityEngine.UI", "Toggle">;
-
-  bool isOn()
-  { return Get<"isOn", bool>(); }
-
-  // Goes through the pointer handler instead of the isOn setter, so interactable checks and listeners behave as
-  // for a real click.
-  void SimulateClick()
-  {
-    if (auto* event = il2cpp::New<PointerEventData>(EventSystem::current()))
-      Call<"OnPointerClick">(event);
+// The game decides visibility here; the hud_* settings are applied on top every time it does.
+int32_t MissionsHudViewController_UpdateButtons_Hook(auto original, MissionsHudViewController* _this)
+{
+  const auto  result = original(_this);
+  const auto& ui     = Config::Get().ui;
+  for (const auto& button : kButtons) {
+    const auto visibility = ui.MissionHudButtonVisibility(button.name);
+    if (visibility == MissionHudVisibility::Auto)
+      continue;
+    auto* component = button.button(_this);
+    if (auto* object = component ? component->gameObject() : nullptr)
+      object->SetActive(visibility == MissionHudVisibility::Always);
   }
-};
+  return result;
+}
 
-struct MissionViewController : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Missions", "MissionViewController">;
+// --- Daily faction claims ---
 
-  Toggle* ClaimAllToggle()
-  { return Field<"_claimAllToggle", Toggle*>(); }
-};
-
-// GetClaimableDailiesList returns List<ITournament>; the items are EventModel today.
-using TournamentList = il2cpp::List<il2cpp::Object*>;
+using DailyGoalList = il2cpp::List<DailyGoal*>;
 
 struct Faction {
   const char* name; // as in daily_bulk_claim_factions
@@ -90,7 +88,7 @@ Transform* FindChild(Transform* root, std::string_view name)
 
 void ShowClaimedFactionIcons(MissionViewController* controller)
 {
-  auto* toggle = controller->ClaimAllToggle();
+  auto* toggle = controller->claimAllToggle();
   auto* parent = toggle && toggle->transform() ? toggle->transform()->parent() : nullptr;
   if (!parent)
     return;
@@ -105,10 +103,10 @@ void ShowClaimedFactionIcons(MissionViewController* controller)
 }
 
 // The faction whose points a daily rewards, lower-cased ("federation"), or empty for other dailies.
-std::string FactionOf(il2cpp::Object* tournament)
+std::string FactionOf(DailyGoal* daily)
 {
   constexpr std::string_view kPrefix = "Resource_FactionPoint_";
-  auto* rewards = tournament ? tournament->Field<"_factionPointRewards", il2cpp::List<InventoryItem*>*>() : nullptr;
+  auto*                      rewards = daily ? daily->factionPointRewards() : nullptr;
   if (!rewards)
     return {};
   for (auto* item : *rewards) {
@@ -120,7 +118,7 @@ std::string FactionOf(il2cpp::Object* tournament)
   return {};
 }
 
-TournamentList* MissionViewController_GetClaimableDailiesList_Hook(auto original, MissionViewController* _this)
+DailyGoalList* MissionViewController_GetClaimableDailiesList_Hook(auto original, MissionViewController* _this)
 {
   auto* list = original(_this);
   ShowClaimedFactionIcons(_this);
@@ -162,11 +160,11 @@ void MissionViewController_AboutToHide_Hook(auto original, MissionViewController
 }
 } // namespace
 
-void DailyFactionBulkClaimUpdate()
+void MissionsUpdate()
 {
   if (!shown_controller || toggle_done || !Config::Get().ui.daily_bulk_claim_toggle_default_on)
     return;
-  auto* toggle = shown_controller->ClaimAllToggle();
+  auto* toggle = shown_controller->claimAllToggle();
   if (!toggle)
     return;
   if (!toggle->isOn()) {
@@ -180,7 +178,7 @@ void DailyFactionBulkClaimUpdate()
   toggle_done = toggle->isOn();
 }
 
-void InstallDailyFactionBulkClaimHooks()
+void InstallDailyClaimFilter()
 {
   using Controller = MissionViewController::Class;
   if (auto m = Controller::Method("GetClaimableDailiesList", 0))
@@ -189,5 +187,11 @@ void InstallDailyFactionBulkClaimHooks()
     SPUD_STATIC_DETOUR(m.Pointer(), MissionViewController_AboutToShow_Hook);
   if (auto m = Controller::Method("AboutToHide", 0))
     SPUD_STATIC_DETOUR(m.Pointer(), MissionViewController_AboutToHide_Hook);
-  InstallScreenManagerUpdateHook();
+  InstallFrameTick();
+}
+
+void InstallMissionHud()
+{
+  if (auto method = MissionsHudViewController::Class::Method("UpdateButtons", 0))
+    SPUD_STATIC_DETOUR(method.Pointer(), MissionsHudViewController_UpdateButtons_Hook);
 }

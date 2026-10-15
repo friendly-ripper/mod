@@ -4,6 +4,8 @@
 #include "patches/patches.h"
 #include "str_utils.h"
 
+#include "prime/Hub.h"
+
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
 #include <spud/detour.h>
@@ -13,11 +15,8 @@
 
 namespace
 {
-struct FabricEventManager;
-
-// Fabric.EventManager.PostEvent(string, EventAction, object, GameObject,
-// InitialiseParameters, bool, OnEventNotify)
-bool FabricEventManager_PostEvent_Hook(auto original, FabricEventManager* _this, Il2CppString* event_name,
+// Fabric.EventManager.PostEvent(string, EventAction, object, GameObject, InitialiseParameters, bool, OnEventNotify)
+bool AudioEventManager_PostEvent_Hook(auto original, Il2CppObject* _this, Il2CppString* event_name,
                                        int event_action, Il2CppObject* parameter, Il2CppObject* parent_game_object,
                                        Il2CppObject* initialise_parameters, bool add_to_queue,
                                        Il2CppObject* on_event_notify)
@@ -36,11 +35,8 @@ bool FabricEventManager_PostEvent_Hook(auto original, FabricEventManager* _this,
 }
 } // namespace
 
-void InstallAudioEventHooks()
+void InstallAudio()
 {
-  using EventManager = il2cpp::Class<"Fabric.Core", "Fabric", "EventManager">;
-
-  // The shorter PostEvent overloads funnel into this seven-argument overload.
-  if (auto method = EventManager::Method("PostEvent", 7))
-    SPUD_STATIC_DETOUR(method.Pointer(), FabricEventManager_PostEvent_Hook);
+  if (auto method = AudioEventManager::Method("PostEvent", 7))
+    SPUD_STATIC_DETOUR(method.Pointer(), AudioEventManager_PostEvent_Hook);
 }

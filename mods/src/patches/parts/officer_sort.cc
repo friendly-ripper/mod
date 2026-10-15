@@ -1,6 +1,8 @@
 #include "config.h"
 #include "str_utils.h"
 
+#include "prime/officers.h"
+
 #include <il2cpp/il2cpp.h>
 
 #include <spdlog/spdlog.h>
@@ -17,46 +19,6 @@ namespace {
 
 constexpr char kBelowDeckKey[]           = "below_deck_ability";
 constexpr char kBelowDeckAssignmentKey[] = "_below_deck_ability";
-
-using SortingPredicates = il2cpp::Class<"Assembly-CSharp", "Digit.Client.Core", "SortingPredicates">;
-
-struct SortFunction : il2cpp::Object {
-  using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.Client.Core", "SortFunction">;
-
-  // Func<object, object, int> delegates.
-  il2cpp::Object* ascending()
-  { return Field<"_ascending", il2cpp::Object*>(); }
-  void SetAscending(Il2CppObject* value)
-  { SetField<"_ascending">(value); }
-  void SetDescending(Il2CppObject* value)
-  { SetField<"_descending">(value); }
-  void SetDisplayKey(Il2CppString* value)
-  { SetField<"_displayKey">(value); }
-};
-
-struct ProcessingOption : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.Sorting", "SortComparer/ProcessingOption">;
-
-  Il2CppString* displayKey()
-  { return Field<"_displayKey", Il2CppString*>(); }
-  void SetDisplayKey(Il2CppString* value)
-  { SetField<"_displayKey">(value); }
-  SortFunction* sortingOption()
-  { return Field<"_sortingOption", SortFunction*>(); }
-  void SetSortingOption(SortFunction* value)
-  { SetField<"_sortingOption">(value); }
-};
-
-struct OfficerSortGenerators : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Officers", "OfficerSortGenerators">;
-
-  il2cpp::List<SortFunction*>* rosterSorters()
-  { return Field<"_rosterSorters", il2cpp::List<SortFunction*>*>(); }
-  il2cpp::List<ProcessingOption*>* rosterOptions()
-  { return Field<"_rosterOptions", il2cpp::List<ProcessingOption*>*>(); }
-  il2cpp::List<ProcessingOption*>* assignmentOptions()
-  { return Field<"_assignmentOptions", il2cpp::List<ProcessingOption*>*>(); }
-};
 
 // Native code of the static SortingPredicates comparers. The delegates below are bound to the BDA
 // predicates but jump to Compare, which chains these directly.
@@ -204,7 +166,7 @@ void InitializeAssignmentSorters_Hook(auto original, OfficerSortGenerators* _thi
 
 } // namespace
 
-void InstallOfficerSortHooks()
+void InstallOfficerSort()
 {
   if (!InitializePredicates())
     return;

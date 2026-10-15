@@ -1,11 +1,14 @@
-// disable_galaxy_chat and disable_veil_chat: greys out those tabs in full-screen chat, keeps the chat preview off
-// them, and drops their messages from the preview.
+// Chat: the shortcuts that open it and switch channel, and disable_galaxy_chat and disable_veil_chat, which grey
+// out those tabs in full-screen chat, keep the chat preview off them, and drop their messages from the preview.
 
 #include "config.h"
 #include "patches/patches.h"
+#include "patches/shortcuts.h"
 
-#include <prime/chat.h>
-#include <prime/ui.h>
+#include "patches/object_tracker.h"
+
+#include "prime/chat.h"
+#include "prime/ui.h"
 
 #include <spud/detour.h>
 
@@ -113,7 +116,44 @@ void ChatPreviewController_OnRegionalMessageReceived_Hook(auto original, ChatPre
 }
 } // namespace
 
-void InstallChatPatches()
+void OpenChatShortcut()
+{
+  const bool side = Shortcut::IsDown(Action::ShowChatSide1) || Shortcut::IsDown(Action::ShowChatSide2);
+  if (!side && !Shortcut::IsDown(Action::ShowChat))
+    return;
+  auto* chat = ChatManager::Instance();
+  if (!chat)
+    return;
+
+  // With side chat already open, the shortcut focuses its input instead.
+  if (chat->IsSideChatOpen()) {
+    auto* view  = ObjectFinder<FullScreenChatViewController>::Get();
+    auto* list  = view ? view->messageList() : nullptr;
+    auto* input = list ? list->inputField() : nullptr;
+    if (input)
+      input->ActivateInputField();
+  } else {
+    chat->OpenChannel(ChatChannelCategory::Alliance, side ? ChatViewMode::Side : ChatViewMode::Fullscreen);
+  }
+}
+
+bool ChatChannelShortcuts()
+{
+  auto* chat = ChatManager::Instance();
+  if (!chat)
+    return false;
+  for (auto [shortcut, channel] : {std::pair{Action::SelectChatGlobal, ChatChannelCategory::Global},
+                                   std::pair{Action::SelectChatAlliance, ChatChannelCategory::Alliance},
+                                   std::pair{Action::SelectChatPrivate, ChatChannelCategory::Private}}) {
+    if (Shortcut::IsDown(shortcut)) {
+      chat->OpenChannel(channel);
+      return true;
+    }
+  }
+  return false;
+}
+
+void InstallChat()
 {
   if (auto m = FullScreenChatViewController::Class::Method("AboutToShow"))
     SPUD_STATIC_DETOUR(m.Pointer(), FullScreenChatViewController_AboutToShow_Hook);

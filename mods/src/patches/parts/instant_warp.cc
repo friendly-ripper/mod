@@ -7,10 +7,10 @@
 #include "ship_name.h"
 #include "str_utils.h"
 
-#include <prime/fleet.h>
-#include <prime/navigation.h>
-#include <prime/ui.h>
-#include <prime/viewers.h>
+#include "prime/fleet.h"
+#include "prime/navigation.h"
+#include "prime/ui.h"
+#include "prime/viewers.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -153,7 +153,7 @@ void UpdateLabel()
   // Toll/wormhole buttons have separate confirmation paths and retain native text.
   if (enabled) {
     auto* fleets     = FleetsManager::Instance();
-    auto* deployment = DeploymentManger::Instance();
+    auto* deployment = DeploymentManager::Instance();
     auto* fleet      = UnityObject::Alive(fleets) ? fleets->GetSelectedFleetData() : nullptr;
     if (fleet && UnityObject::Alive(deployment) && deployment->HasInstantWarpAbility(fleet)) {
       switch (ResolveConfirmation(fleet)) {
@@ -173,13 +173,31 @@ void UpdateLabel()
 }
 } // namespace
 
-void WarpActionLabelUpdate()
+void InstantWarpUpdate()
 {
   if (label_installed)
     UpdateLabel();
 }
 
-void InstallInstantWarpConfirmationHooks()
+void CycleInstantWarpConfirmation()
+{
+  auto& setting = Config::Get().ui.auto_confirm_instant_warp;
+  switch (setting) {
+    case InstantWarpConfirmation::None:
+      setting = InstantWarpConfirmation::Warp;
+      break;
+    case InstantWarpConfirmation::Warp:
+      setting = InstantWarpConfirmation::Jump;
+      break;
+    case InstantWarpConfirmation::Jump:
+      setting = InstantWarpConfirmation::None;
+      break;
+  }
+  constexpr const char* kNames[] = {"none", "warp", "jump"};
+  spdlog::info("Auto-confirm instant warp set to {}", kNames[static_cast<int>(setting)]);
+}
+
+void InstallInstantWarp()
 {
   // The hook is useless without both popup actions, so skip it (and the label) when either has drifted.
   const auto about_to_show = CoursePromptPopupViewController::Class::Method("AboutToShow", 0);
@@ -190,7 +208,7 @@ void InstallInstantWarpConfirmationHooks()
 
   if (!SPUD_STATIC_DETOUR(about_to_show.Pointer(), CoursePromptPopupViewController_AboutToShow_Hook))
     return;
-  label_installed = InstallScreenManagerUpdateHook();
+  label_installed = InstallFrameTick();
   if (label_installed)
     spdlog::info("[WarpActionLabel] system-card action labels enabled");
 }

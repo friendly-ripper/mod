@@ -5,8 +5,9 @@
 #include "patches/patches.h"
 #include "version.h"
 
-#include <prime/ui.h>
-#include <prime/unity.h>
+#include "prime/loading.h"
+#include "prime/ui.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -28,56 +29,6 @@
 
 namespace
 {
-struct Rect {
-  float x, y, width, height;
-};
-
-struct Texture2D : il2cpp::Object {
-  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Texture2D">;
-
-  int32_t width()
-  { return Get<"width", int32_t>(); }
-  int32_t height()
-  { return Get<"height", int32_t>(); }
-};
-
-struct LoginSequence : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Login", "LoginSequence">;
-
-  Component* mainCanvas()
-  { return Field<"_mainCanvas", Component*>(); }
-};
-
-struct LoadingTipViewController : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Prime.LoadingScreen", "LoadingTipViewController">;
-
-  TMP_Text* textMeshPro()
-  { return Field<"_textMeshPro", TMP_Text*>(); }
-};
-
-struct TransitionViewController : Component {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.LoadingScreen", "TransitionViewController">;
-
-  Image* staticOverride()
-  { return Field<"_staticOverride", Image*>(); }
-  // The canvas Animator; Behaviour is enough to toggle it.
-  Behaviour* animator()
-  { return Field<"_animator", Behaviour*>(); }
-};
-
-struct SlideShowViewController : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.SlideShow", "SlideShowViewController">;
-
-  Image* image()
-  { return Field<"_image", Image*>(); }
-};
-
-using ImageConversion = il2cpp::Class<"UnityEngine.ImageConversionModule", "UnityEngine", "ImageConversion">;
-using Screen          = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Screen">;
-using Byte            = il2cpp::Class<"mscorlib", "System", "Byte">;
-// The non-generic MonoSingleton base; its static PrepareAllForReload runs before a reload.
-using MonoSingletonBase = il2cpp::Class<"Assembly-CSharp", "", "MonoSingleton">;
-
 void ShowSprite(Image* image, Sprite* sprite, bool preserve_aspect)
 {
   image->SetSprite(sprite);
@@ -95,13 +46,13 @@ void HideImage(Image* image)
 
 Texture2D* LoadTexture(const uint8_t* data, size_t size)
 {
-  auto* bytes = data && size ? il2cpp::Array<uint8_t>::New(Byte::Raw(), size) : nullptr;
+  auto* bytes = data && size ? il2cpp::Array<uint8_t>::New(SystemByte::Raw(), size) : nullptr;
   if (!bytes)
     return nullptr;
   std::memcpy(bytes->data(), data, size);
   // Texture2D(width, height, TextureFormat.RGBA32, mipChain); LoadImage resizes it.
   auto* texture = il2cpp::New<Texture2D>(int32_t{2}, int32_t{2}, int32_t{4}, false);
-  return texture && ImageConversion::Call<"LoadImage", bool>(texture, bytes, false) ? texture : nullptr;
+  return texture && ImageConversion::LoadImage(texture, bytes) ? texture : nullptr;
 }
 
 // One image the mod shows, decoded once and kept while Unity keeps it: a reload unloads it, and the next use
@@ -135,7 +86,7 @@ public:
     if (!texture)
       return nullptr;
     const Rect rect{0.0f, 0.0f, static_cast<float>(texture->width()), static_cast<float>(texture->height())};
-    auto*      sprite = ::Sprite::Class::Call<"Create", ::Sprite*>(texture, rect, Vector2{0.5f, 0.5f});
+    auto*      sprite = ::Sprite::Create(texture, rect, Vector2{0.5f, 0.5f});
     if (!sprite) {
       spdlog::warn("[LS] failed to create {} sprite", name_);
       return nullptr;
@@ -229,8 +180,8 @@ bool CreateLogo(const char* name, ImageAsset* asset, Transform* parent, Corner c
   if (!asset || !parent)
     return false;
 
-  float width  = static_cast<float>(Screen::Get<"width", int32_t>());
-  float height = static_cast<float>(Screen::Get<"height", int32_t>());
+  float width  = static_cast<float>(Screen::width());
+  float height = static_cast<float>(Screen::height());
   if (width <= 0.0f)
     width = 1334.0f;
   if (height <= 0.0f)
@@ -517,21 +468,21 @@ void InstallReloadReset()
 }
 } // namespace
 
-void InstallLoadingScreenHooks()
+void InstallLoginScreen()
 {
   InstallReloadReset();
   if (auto m = LoginSequence::Class::Method("Awake"))
     SPUD_STATIC_DETOUR(m.Pointer(), LoginSequence_Awake_Hook);
 }
 
-void InstallLoadingTipHooks()
+void InstallLoadingTips()
 {
   InstallReloadReset();
   if (auto m = LoadingTipViewController::Class::Method("SetRandomTipLocalisedText"))
     SPUD_STATIC_DETOUR(m.Pointer(), LoadingTipViewController_SetRandomTipLocalisedText_Hook);
 }
 
-void InstallTransitionScreenHooks()
+void InstallTransitionScreen()
 {
   InstallReloadReset();
   if (auto m = TransitionViewController::Class::Method("Awake"))

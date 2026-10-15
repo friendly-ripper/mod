@@ -196,7 +196,10 @@ const ModifierName* FindModifier(std::string_view name)
   return it == std::end(kModifiers) ? nullptr : it;
 }
 
-std::array<std::vector<KeyChord>, GameFunction::Max> bindings;
+std::array<std::vector<KeyChord>, static_cast<size_t>(Action::Max)> bindings;
+
+std::vector<KeyChord>& BindingsOf(Action action)
+{ return bindings[static_cast<size_t>(action)]; }
 
 // Keys that completed a binding with modifiers, until released. A plain binding on the same key waits for the
 // release, so letting go of CTRL before PGUP does not turn a held CTRL-PGUP into PGUP.
@@ -214,9 +217,9 @@ bool ModifiersHeld(const KeyChord& chord)
                              [](const auto& group) { return std::ranges::any_of(group, Key::Pressed); });
 }
 
-template <bool (*KeyState)(KeyCode)> bool Matches(GameFunction action)
+template <bool (*KeyState)(KeyCode)> bool Matches(Action action)
 {
-  for (const auto& chord : bindings[action]) {
+  for (const auto& chord : BindingsOf(action)) {
     if (chord.key == KeyCode::None || !KeyState(chord.key))
       continue;
     if (chord.modifiers.empty() ? Key::IsModified() || IsUsed(chord.key) : !ModifiersHeld(chord))
@@ -232,7 +235,7 @@ enum class Tier { kAlways, kExtended, kExperimental };
 
 struct Setting {
   std::string_view                key;
-  GameFunction                    action;
+  Action                    action;
   std::string_view                fallback;
   Tier                            tier    = Tier::kAlways;
   std::array<std::string_view, 2> aliases = {};
@@ -240,116 +243,116 @@ struct Setting {
 
 // Order is the order of the debug log; the TOML output is sorted by key anyway.
 constexpr Setting kSettings[] = {
-    {"move_up", GameFunction::MoveUp, "W|UP"},
-    {"move_down", GameFunction::MoveDown, "S|DOWN"},
-    {"move_left", GameFunction::MoveLeft, "A|LEFT"},
-    {"move_right", GameFunction::MoveRight, "D|RIGHT"},
+    {"move_up", Action::MoveUp, "W|UP"},
+    {"move_down", Action::MoveDown, "S|DOWN"},
+    {"move_left", Action::MoveLeft, "A|LEFT"},
+    {"move_right", Action::MoveRight, "D|RIGHT"},
     {"set_hotkeys_disabled",
-     GameFunction::DisableHotKeys,
+     Action::DisableHotKeys,
      "CTRL-ALT-MINUS",
      Tier::kAlways,
      {"set_hotkeys_disble", "set_hotkeys_disable"}},
-    {"set_hotkeys_enabled", GameFunction::EnableHotKeys, "CTRL-ALT-=", Tier::kAlways, {"set_hotkeys_enable"}},
-    {"select_chatalliance", GameFunction::SelectChatAlliance, "CTRL-2"},
-    {"select_chatglobal", GameFunction::SelectChatGlobal, "CTRL-1"},
-    {"select_chatprivate", GameFunction::SelectChatPrivate, "CTRL-3"},
-    {"quit", GameFunction::Quit, "F10"},
-    {"select_ship1", GameFunction::SelectShip1, "1"},
-    {"select_ship2", GameFunction::SelectShip2, "2"},
-    {"select_ship3", GameFunction::SelectShip3, "3"},
-    {"select_ship4", GameFunction::SelectShip4, "4"},
-    {"select_ship5", GameFunction::SelectShip5, "5"},
-    {"select_ship6", GameFunction::SelectShip6, "6"},
-    {"select_ship7", GameFunction::SelectShip7, "7"},
-    {"select_ship8", GameFunction::SelectShip8, "8"},
-    {"select_current", GameFunction::SelectCurrent, "CTRL-SPACE"},
-    {"focus_search", GameFunction::FocusSearch, "CTRL-F"},
-    {"action_primary", GameFunction::ActionPrimary, "SPACE|MOUSE1"},
-    {"action_secondary", GameFunction::ActionSecondary, "TAB|MOUSE4"},
-    {"action_queue", GameFunction::ActionQueue, "SPACE|MOUSE1"},
-    {"action_queue_clear", GameFunction::ActionQueueClear, "CTRL-C"},
-    {"action_view", GameFunction::ActionView, "V|MOUSE2"},
-    {"action_recall", GameFunction::ActionRecall, "R|MOUSE3"},
-    {"action_recall_cancel", GameFunction::ActionRecallCancel, "SPACE|MOUSE1"},
-    {"action_repair", GameFunction::ActionRepair, "R|MOUSE3"},
-    {"show_chat", GameFunction::ShowChat, "C"},
-    {"show_chatside1", GameFunction::ShowChatSide1, "ALT-C"},
-    {"show_chatside2", GameFunction::ShowChatSide2, "`"},
-    {"show_galaxy", GameFunction::ShowGalaxy, "G"},
-    {"show_galaxy_native", GameFunction::NativeShortcutGalaxy, "CTRL-G", Tier::kAlways, {"native_shortcut_galaxy"}},
-    {"show_system", GameFunction::ShowSystem, "H"},
-    {"zoom_preset1", GameFunction::ZoomPreset1, "F1"},
-    {"zoom_preset2", GameFunction::ZoomPreset2, "F2"},
-    {"zoom_preset3", GameFunction::ZoomPreset3, "F3"},
-    {"zoom_preset4", GameFunction::ZoomPreset4, "F4"},
-    {"zoom_preset5", GameFunction::ZoomPreset5, "F5"},
-    {"zoom_in", GameFunction::ZoomIn, "Q"},
-    {"zoom_out", GameFunction::ZoomOut, "E"},
-    {"zoom_max", GameFunction::ZoomMax, "MINUS"},
-    {"zoom_min", GameFunction::ZoomMin, "BACKSPACE"},
-    {"zoom_reset", GameFunction::ZoomReset, "="},
-    {"ui_scaleup", GameFunction::UiScaleUp, "PGUP"},
-    {"ui_scaledown", GameFunction::UiScaleDown, "PGDOWN"},
-    {"ui_scaleshipup", GameFunction::UiShipScaleUp, "CTRL-PGUP"},
-    {"ui_scaleshipdown", GameFunction::UiShipScaleDown, "CTRL-PGDOWN"},
-    {"ui_scaleviewerup", GameFunction::UiViewerScaleUp, "SHIFT-PGUP"},
-    {"ui_scaleviewerdown", GameFunction::UiViewerScaleDown, "SHIFT-PGDOWN"},
-    {"log_debug", GameFunction::LogLevelDebug, "CTRL-SHIFT-F9"},
-    {"log_trace", GameFunction::LogLevelTrace, "CTRL-SHIFT-F7"},
-    {"log_info", GameFunction::LogLevelInfo, "CTRL-SHIFT-F8"},
-    {"log_warn", GameFunction::LogLevelWarn, "CTRL-SHIFT-F10"},
-    {"log_error", GameFunction::LogLevelError, "CTRL-SHIFT-F11"},
-    {"log_off", GameFunction::LogLevelOff, "CTRL-SHIFT-F12"},
-    {"restart", GameFunction::Restart, "F9"},
-    {"reload_settings", GameFunction::ReloadSettings, "CTRL-SHIFT-F6"},
-    {"show_awayteam", GameFunction::ShowAwayTeam, "T"},
-    {"show_gifts", GameFunction::ShowGifts, "/"},
-    {"show_artifacts", GameFunction::ShowArtifacts, "SHIFT-I"},
-    {"show_commander", GameFunction::ShowCommander, "O"},
-    {"show_daily", GameFunction::ShowDaily, "Z"},
-    {"show_events", GameFunction::ShowEvents, "SHIFT-E"},
-    {"show_events_native", GameFunction::NativeShortcutEvents, "CTRL-E", Tier::kAlways, {"native_shortcut_events"}},
-    {"show_exocomp", GameFunction::ShowExoComp, "X"},
-    {"show_factions", GameFunction::ShowFactions, "F"},
-    {"show_inventory", GameFunction::ShowInventory, "I"},
-    {"show_missions", GameFunction::ShowMissions, "M"},
-    {"show_research", GameFunction::ShowResearch, "U"},
-    {"show_scrapyard", GameFunction::ShowScrapYard, "Y"},
-    {"show_settings", GameFunction::ShowSettings, "SHIFT-S"},
-    {"toggle_shortcut_hints", GameFunction::ToggleShortcutHints, "HOME"},
-    {"show_officers", GameFunction::ShowOfficers, "SHIFT-O"},
-    {"show_officerpresets", GameFunction::ShowOfficerPresets, "CTRL-O"},
-    {"show_officerswap", GameFunction::ShowOfficerSwap, "ALT-O"},
-    {"show_qtrials", GameFunction::ShowQTrials, "SHIFT-Q"},
-    {"show_refinery", GameFunction::ShowRefinery, "SHIFT-F"},
-    {"show_ships", GameFunction::ShowShips, "N"},
-    {"show_shipconstruction", GameFunction::ShowShipConstruction, "SHIFT-N"},
-    {"show_shipswap", GameFunction::ShowShipSwap, "ALT-N"},
-    {"show_shields", GameFunction::ShowShields, "CTRL-S"},
-    {"show_battlelogs", GameFunction::ShowBattlelogs, "SHIFT-B"},
-    {"show_stationexterior", GameFunction::ShowStationExterior, "SHIFT-G"},
-    {"show_stationinterior", GameFunction::ShowStationInterior, "SHIFT-H"},
-    {"show_haven", GameFunction::ShowHaven, "ALT-H"},
-    {"toggle_queue", GameFunction::ToggleQueue, "CTRL-Q"},
-    {"toggle_instant_warp", GameFunction::ToggleAutoConfirmInstantWarp, "ALT-I"},
-    {"show_alliance", GameFunction::ShowAlliance, "ALT-'", Tier::kExtended},
-    {"show_alliance_help", GameFunction::ShowAllianceHelp, "SHIFT-'", Tier::kExperimental},
-    {"show_alliance_armada", GameFunction::ShowAllianceArmada, "CTRL-'", Tier::kExperimental},
-    {"show_bookmarks", GameFunction::ShowBookmarks, "B", Tier::kExtended},
-    {"show_lookup", GameFunction::ShowLookup, "L", Tier::kExperimental},
-    {"set_zoom_preset1", GameFunction::SetZoomPreset1, "SHIFT-F1", Tier::kExtended},
-    {"set_zoom_preset2", GameFunction::SetZoomPreset2, "SHIFT-F2", Tier::kExtended},
-    {"set_zoom_preset3", GameFunction::SetZoomPreset3, "SHIFT-F3", Tier::kExtended},
-    {"set_zoom_preset4", GameFunction::SetZoomPreset4, "SHIFT-F4", Tier::kExtended},
-    {"set_zoom_preset5", GameFunction::SetZoomPreset5, "SHIFT-F5", Tier::kExtended},
-    {"set_zoom_default", GameFunction::SetZoomDefault, "CTRL-=", Tier::kExtended},
-    {"toggle_preview_locate", GameFunction::TogglePreviewLocate, "CTRL-R", Tier::kExtended},
-    {"toggle_preview_recall", GameFunction::TogglePreviewRecall, "CTRL-T", Tier::kExtended},
-    {"toggle_cargo_default", GameFunction::ToggleCargoDefault, "ALT-1", Tier::kExtended},
-    {"toggle_cargo_player", GameFunction::ToggleCargoPlayer, "ALT-2", Tier::kExtended},
-    {"toggle_cargo_station", GameFunction::ToggleCargoStation, "ALT-3", Tier::kExtended},
-    {"toggle_cargo_hostile", GameFunction::ToggleCargoHostile, "ALT-4", Tier::kExtended},
-    {"toggle_cargo_armada", GameFunction::ToggleCargoArmada, "ALT-5", Tier::kExtended},
+    {"set_hotkeys_enabled", Action::EnableHotKeys, "CTRL-ALT-=", Tier::kAlways, {"set_hotkeys_enable"}},
+    {"select_chatalliance", Action::SelectChatAlliance, "CTRL-2"},
+    {"select_chatglobal", Action::SelectChatGlobal, "CTRL-1"},
+    {"select_chatprivate", Action::SelectChatPrivate, "CTRL-3"},
+    {"quit", Action::Quit, "F10"},
+    {"select_ship1", Action::SelectShip1, "1"},
+    {"select_ship2", Action::SelectShip2, "2"},
+    {"select_ship3", Action::SelectShip3, "3"},
+    {"select_ship4", Action::SelectShip4, "4"},
+    {"select_ship5", Action::SelectShip5, "5"},
+    {"select_ship6", Action::SelectShip6, "6"},
+    {"select_ship7", Action::SelectShip7, "7"},
+    {"select_ship8", Action::SelectShip8, "8"},
+    {"select_current", Action::SelectCurrent, "CTRL-SPACE"},
+    {"focus_search", Action::FocusSearch, "CTRL-F"},
+    {"action_primary", Action::ActionPrimary, "SPACE|MOUSE1"},
+    {"action_secondary", Action::ActionSecondary, "TAB|MOUSE4"},
+    {"action_queue", Action::ActionQueue, "SPACE|MOUSE1"},
+    {"action_queue_clear", Action::ActionQueueClear, "CTRL-C"},
+    {"action_view", Action::ActionView, "V|MOUSE2"},
+    {"action_recall", Action::ActionRecall, "R|MOUSE3"},
+    {"action_recall_cancel", Action::ActionRecallCancel, "SPACE|MOUSE1"},
+    {"action_repair", Action::ActionRepair, "R|MOUSE3"},
+    {"show_chat", Action::ShowChat, "C"},
+    {"show_chatside1", Action::ShowChatSide1, "ALT-C"},
+    {"show_chatside2", Action::ShowChatSide2, "`"},
+    {"show_galaxy", Action::ShowGalaxy, "G"},
+    {"show_galaxy_native", Action::NativeShortcutGalaxy, "CTRL-G", Tier::kAlways, {"native_shortcut_galaxy"}},
+    {"show_system", Action::ShowSystem, "H"},
+    {"zoom_preset1", Action::ZoomPreset1, "F1"},
+    {"zoom_preset2", Action::ZoomPreset2, "F2"},
+    {"zoom_preset3", Action::ZoomPreset3, "F3"},
+    {"zoom_preset4", Action::ZoomPreset4, "F4"},
+    {"zoom_preset5", Action::ZoomPreset5, "F5"},
+    {"zoom_in", Action::ZoomIn, "Q"},
+    {"zoom_out", Action::ZoomOut, "E"},
+    {"zoom_max", Action::ZoomMax, "MINUS"},
+    {"zoom_min", Action::ZoomMin, "BACKSPACE"},
+    {"zoom_reset", Action::ZoomReset, "="},
+    {"ui_scaleup", Action::UiScaleUp, "PGUP"},
+    {"ui_scaledown", Action::UiScaleDown, "PGDOWN"},
+    {"ui_scaleshipup", Action::UiShipScaleUp, "CTRL-PGUP"},
+    {"ui_scaleshipdown", Action::UiShipScaleDown, "CTRL-PGDOWN"},
+    {"ui_scaleviewerup", Action::UiViewerScaleUp, "SHIFT-PGUP"},
+    {"ui_scaleviewerdown", Action::UiViewerScaleDown, "SHIFT-PGDOWN"},
+    {"log_debug", Action::LogLevelDebug, "CTRL-SHIFT-F9"},
+    {"log_trace", Action::LogLevelTrace, "CTRL-SHIFT-F7"},
+    {"log_info", Action::LogLevelInfo, "CTRL-SHIFT-F8"},
+    {"log_warn", Action::LogLevelWarn, "CTRL-SHIFT-F10"},
+    {"log_error", Action::LogLevelError, "CTRL-SHIFT-F11"},
+    {"log_off", Action::LogLevelOff, "CTRL-SHIFT-F12"},
+    {"restart", Action::Restart, "F9"},
+    {"reload_settings", Action::ReloadSettings, "CTRL-SHIFT-F6"},
+    {"show_awayteam", Action::ShowAwayTeam, "T"},
+    {"show_gifts", Action::ShowGifts, "/"},
+    {"show_artifacts", Action::ShowArtifacts, "SHIFT-I"},
+    {"show_commander", Action::ShowCommander, "O"},
+    {"show_daily", Action::ShowDaily, "Z"},
+    {"show_events", Action::ShowEvents, "SHIFT-E"},
+    {"show_events_native", Action::NativeShortcutEvents, "CTRL-E", Tier::kAlways, {"native_shortcut_events"}},
+    {"show_exocomp", Action::ShowExoComp, "X"},
+    {"show_factions", Action::ShowFactions, "F"},
+    {"show_inventory", Action::ShowInventory, "I"},
+    {"show_missions", Action::ShowMissions, "M"},
+    {"show_research", Action::ShowResearch, "U"},
+    {"show_scrapyard", Action::ShowScrapYard, "Y"},
+    {"show_settings", Action::ShowSettings, "SHIFT-S"},
+    {"toggle_shortcut_hints", Action::ToggleShortcutHints, "HOME"},
+    {"show_officers", Action::ShowOfficers, "SHIFT-O"},
+    {"show_officerpresets", Action::ShowOfficerPresets, "CTRL-O"},
+    {"show_officerswap", Action::ShowOfficerSwap, "ALT-O"},
+    {"show_qtrials", Action::ShowQTrials, "SHIFT-Q"},
+    {"show_refinery", Action::ShowRefinery, "SHIFT-F"},
+    {"show_ships", Action::ShowShips, "N"},
+    {"show_shipconstruction", Action::ShowShipConstruction, "SHIFT-N"},
+    {"show_shipswap", Action::ShowShipSwap, "ALT-N"},
+    {"show_shields", Action::ShowShields, "CTRL-S"},
+    {"show_battlelogs", Action::ShowBattlelogs, "SHIFT-B"},
+    {"show_stationexterior", Action::ShowStationExterior, "SHIFT-G"},
+    {"show_stationinterior", Action::ShowStationInterior, "SHIFT-H"},
+    {"show_haven", Action::ShowHaven, "ALT-H"},
+    {"toggle_queue", Action::ToggleQueue, "CTRL-Q"},
+    {"toggle_instant_warp", Action::ToggleAutoConfirmInstantWarp, "ALT-I"},
+    {"show_alliance", Action::ShowAlliance, "ALT-'", Tier::kExtended},
+    {"show_alliance_help", Action::ShowAllianceHelp, "SHIFT-'", Tier::kExperimental},
+    {"show_alliance_armada", Action::ShowAllianceArmada, "CTRL-'", Tier::kExperimental},
+    {"show_bookmarks", Action::ShowBookmarks, "B", Tier::kExtended},
+    {"show_lookup", Action::ShowLookup, "L", Tier::kExperimental},
+    {"set_zoom_preset1", Action::SetZoomPreset1, "SHIFT-F1", Tier::kExtended},
+    {"set_zoom_preset2", Action::SetZoomPreset2, "SHIFT-F2", Tier::kExtended},
+    {"set_zoom_preset3", Action::SetZoomPreset3, "SHIFT-F3", Tier::kExtended},
+    {"set_zoom_preset4", Action::SetZoomPreset4, "SHIFT-F4", Tier::kExtended},
+    {"set_zoom_preset5", Action::SetZoomPreset5, "SHIFT-F5", Tier::kExtended},
+    {"set_zoom_default", Action::SetZoomDefault, "CTRL-=", Tier::kExtended},
+    {"toggle_preview_locate", Action::TogglePreviewLocate, "CTRL-R", Tier::kExtended},
+    {"toggle_preview_recall", Action::TogglePreviewRecall, "CTRL-T", Tier::kExtended},
+    {"toggle_cargo_default", Action::ToggleCargoDefault, "ALT-1", Tier::kExtended},
+    {"toggle_cargo_player", Action::ToggleCargoPlayer, "ALT-2", Tier::kExtended},
+    {"toggle_cargo_station", Action::ToggleCargoStation, "ALT-3", Tier::kExtended},
+    {"toggle_cargo_hostile", Action::ToggleCargoHostile, "ALT-4", Tier::kExtended},
+    {"toggle_cargo_armada", Action::ToggleCargoArmada, "ALT-5", Tier::kExtended},
 };
 
 // Binds every chord in `value` ("CTRL-G|F8"). Reports whether any was valid.
@@ -479,8 +482,8 @@ void Load(const toml::table& config, toml::table& parsed, bool extended, bool ex
   }
 }
 
-void Bind(GameFunction action, KeyChord chord)
-{ bindings[action].push_back(std::move(chord)); }
+void Bind(Action action, KeyChord chord)
+{ BindingsOf(action).push_back(std::move(chord)); }
 
 void Clear()
 {
@@ -492,21 +495,21 @@ void Clear()
 bool Owns(KeyCode key)
 { return IsUsed(key); }
 
-bool HasBinding(GameFunction action)
+bool HasBinding(Action action)
 {
-  return std::ranges::any_of(bindings[action], [](const auto& chord) { return chord.key != KeyCode::None; });
+  return std::ranges::any_of(BindingsOf(action), [](const auto& chord) { return chord.key != KeyCode::None; });
 }
 
-bool IsPressed(GameFunction action)
+bool IsPressed(Action action)
 { return Matches<Key::Pressed>(action); }
 
-bool IsDown(GameFunction action)
+bool IsDown(Action action)
 { return Matches<Key::Down>(action); }
 
-std::string Describe(GameFunction action)
+std::string Describe(Action action)
 {
   std::string text;
-  for (const auto& chord : bindings[action]) {
+  for (const auto& chord : BindingsOf(action)) {
     if (!text.empty())
       text += " | ";
     text += chord.Text();
@@ -514,9 +517,9 @@ std::string Describe(GameFunction action)
   return text;
 }
 
-std::string Hint(GameFunction action)
+std::string Hint(Action action)
 {
   // The game's badges have room for one binding.
-  return bindings[action].empty() ? std::string{} : bindings[action].front().Hint();
+  return BindingsOf(action).empty() ? std::string{} : BindingsOf(action).front().Hint();
 }
 } // namespace Shortcut

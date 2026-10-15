@@ -29,7 +29,7 @@ Registry& registry();
 } // namespace object_tracker
 
 template <typename T> struct ObjectFinder {
-  // The newest live instance, or null. Only classes InstallObjectTrackers registers are ever found.
+  // The newest live instance, or null. Only classes InstallObjectTracker registers are ever found.
   static T* Get()
   {
     auto&            registry = object_tracker::registry();

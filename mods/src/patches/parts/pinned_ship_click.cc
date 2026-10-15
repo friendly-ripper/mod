@@ -39,7 +39,7 @@ bool IsShipManagementScreenVisible()
   for (auto* controller : ObjectFinder<ShipManagementViewController>::GetAll()) {
     if (!controller || !controller->isActiveAndEnabled()) continue;
 
-    auto canvas = GetCanvasControllerFromComponent(controller);
+    auto canvas = CanvasController::Of(controller);
     if (canvas && canvas->Visible()) return true;
   }
   return false;
@@ -103,7 +103,7 @@ void RefreshPinnedShipSortNow()
   for (auto* controller : ObjectFinder<ShipManagementViewController>::GetAll()) {
     if (!controller || !controller->isActiveAndEnabled()) continue;
 
-    auto canvas = GetCanvasControllerFromComponent(controller);
+    auto canvas = CanvasController::Of(controller);
     if (!canvas || !canvas->Visible()) continue;
 
     auto* context = controller->Context();

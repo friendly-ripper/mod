@@ -1,29 +1,12 @@
 #include "patches/input.h"
 
-#include <prime/unity.h>
-
-#include <il2cpp/il2cpp.h>
+#include "prime/unity.h"
 
 #include <algorithm>
 #include <array>
 
 namespace
 {
-// Unity's internal calls. A missing one (renamed by a Unity upgrade) reads as nothing held.
-struct Input {
-  il2cpp::ICall<int()>         frame_count{"UnityEngine.Time::get_frameCount()"};
-  il2cpp::ICall<bool()>        any_key{"UnityEngine.Input::get_anyKey()"};
-  il2cpp::ICall<bool()>        any_key_down{"UnityEngine.Input::get_anyKeyDown()"};
-  il2cpp::ICall<bool(KeyCode)> key{"UnityEngine.Input::GetKeyInt(UnityEngine.KeyCode)"};
-  il2cpp::ICall<bool(KeyCode)> key_down{"UnityEngine.Input::GetKeyDownInt(UnityEngine.KeyCode)"};
-};
-
-const Input& Unity()
-{
-  static const Input input;
-  return input;
-}
-
 // This frame's snapshot. On an idle frame anyKey is false and no key is asked about at all; otherwise each key is
 // one internal call, which Unity answers from its own per-frame state.
 struct Frame {
@@ -47,23 +30,18 @@ namespace Key
 {
 void Poll()
 {
-  const auto& unity = Unity();
-  if (!unity.frame_count)
+  // Without the frame count nothing is ever read: no key counts as pressed.
+  const int number = Time::frameCount();
+  if (number < 0 || number == frame.number)
     return;
-  const int number = unity.frame_count();
-  if (number == frame.number)
-    return;
-  // Without the any-key calls every key is asked about, as if something were always held.
-  frame = {.number   = number,
-           .any_held = !unity.any_key || unity.any_key(),
-           .any_down = !unity.any_key_down || unity.any_key_down()};
+  frame = {.number = number, .any_held = Input::anyKey(), .any_down = Input::anyKeyDown()};
 }
 
 bool Pressed(KeyCode key)
-{ return frame.any_held && Unity().key(key); }
+{ return frame.any_held && Input::GetKey(key); }
 
 bool Down(KeyCode key)
-{ return frame.any_down && Unity().key_down(key); }
+{ return frame.any_down && Input::GetKeyDown(key); }
 
 bool IsModified()
 {

@@ -3,16 +3,18 @@
 // Configurable shortcuts: the actions they trigger, parsing [shortcuts] from the settings file, and
 // matching the parsed key chords against this frame's input.
 
-#include <prime/KeyCode.h>
+#include "prime/KeyCode.h"
 
 #include <toml++/toml.h>
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
-enum GameFunction {
+// What a shortcut does. Each [shortcuts] setting binds key chords to one action.
+enum class Action : uint8_t {
   MoveLeft,
   MoveRight,
   MoveUp,
@@ -149,20 +151,20 @@ namespace Shortcut
 void Load(const toml::table& config, toml::table& parsed, bool extended, bool experimental);
 
 // Adds a binding directly. Load uses this; tests use it to set up bindings.
-void Bind(GameFunction action, KeyChord chord);
+void Bind(Action action, KeyChord chord);
 void Clear();
 
-bool HasBinding(GameFunction action);
+bool HasBinding(Action action);
 // Any binding of `action` is held with its modifiers. A binding without modifiers needs none held; one with
 // modifiers still fires when extra modifiers are held (CTRL-F1 fires under CTRL+SHIFT).
-bool IsPressed(GameFunction action);
+bool IsPressed(Action action);
 // Any binding of `action` went down this frame with its modifiers held.
-bool IsDown(GameFunction action);
+bool IsDown(Action action);
 // A binding with modifiers matched on `key`, which is still held. Plain bindings on it wait for the release.
 bool Owns(KeyCode key);
 
 // "CTRL-G | F8"
-std::string Describe(GameFunction action);
+std::string Describe(Action action);
 // The badge text of the first binding, or empty when unbound.
-std::string Hint(GameFunction action);
+std::string Hint(Action action);
 } // namespace Shortcut

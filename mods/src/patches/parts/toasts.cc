@@ -6,9 +6,9 @@
 #include "patches/patches.h"
 #include "str_utils.h"
 
-#include <prime/fleet.h>
-#include <prime/server.h>
-#include <prime/ui.h>
+#include "prime/fleet.h"
+#include "prime/server.h"
+#include "prime/ui.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/fmt/fmt.h>
@@ -29,85 +29,65 @@ namespace
 {
 using toast_text::FormatPlaceholders;
 
-struct ToastObserver : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "ToastObserver">;
-};
-
-// Digit.PrimePlatform.Models.EventCategories, a struct around one int32. The binding layer checks the kind, so it
-// is read as the struct, not as an int.
-struct EventCategories {
-  int32_t value;
-};
-
-struct EventModel : il2cpp::Object {
-  using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimePlatform.Models", "EventModel">;
-
-  int32_t category()
-  { return Field<"category_", EventCategories>().value; }
-};
-
-using SystemObject = il2cpp::Class<"mscorlib", "System", "Object">;
-using SystemInt64  = il2cpp::Class<"mscorlib", "System", "Int64">;
-
-constexpr std::pair<int, const char*> kTitles[] = {
-    {Standard, "Notification"},
-    {FactionWarning, "Faction Warning"},
-    {FactionLevelUp, "Faction Level Up"},
-    {FactionLevelDown, "Faction Level Down"},
-    {FactionDiscovered, "Faction Discovered"},
-    {IncomingAttack, "Incoming Attack!"},
-    {IncomingAttackFaction, "Incoming Faction Attack!"},
-    {FleetBattle, "Fleet Battle"},
-    {StationBattle, "Station Under Attack!"},
-    {StationVictory, "Station Victory!"},
-    {Victory, "Victory!"},
-    {Defeat, "Defeat"},
-    {StationDefeat, "Station Defeat"},
-    {Tournament, "Event Progress"},
-    {ArmadaCreated, "Armada Created"},
-    {ArmadaCanceled, "Armada Canceled"},
-    {ArmadaIncomingAttack, "Armada Under Attack!"},
-    {ArmadaBattleWon, "Armada Victory!"},
-    {ArmadaBattleLost, "Armada Defeated"},
-    {DiplomacyUpdated, "Diplomacy Updated"},
-    {JoinedTakeover, "Territory Capture Joined"},
-    {CompetitorJoinedTakeover, "Competitor Joined Territory"},
-    {AbandonedTerritory, "Territory Abandoned"},
-    {TakeoverVictory, "Takeover Victory!"},
-    {TakeoverDefeat, "Takeover Defeat"},
-    {TreasuryProgress, "Treasury Progress"},
-    {TreasuryFull, "Treasury Full"},
-    {Achievement, "Achievement"},
-    {AssaultVictory, "Assault Victory!"},
-    {AssaultDefeat, "Assault Defeat"},
-    {ChallengeComplete, "Challenge Complete"},
-    {ChallengeFailed, "Challenge Failed"},
-    {StrikeHit, "Strike Hit"},
-    {StrikeDefeat, "Strike Defeat"},
-    {WarchestProgress, "Warchest Progress"},
-    {WarchestFull, "Warchest Full"},
-    {PartialVictory, "Partial Victory"},
-    {ArenaTimeLeft, "Arena Time Warning"},
-    {ChainedEventScored, "Event Progress"},
-    {FleetPresetApplied, "Fleet Preset Applied"},
-    {SurgeWarmUpEnded, "Surge Started"},
-    {SurgeHostileGroupDefeated, "Surge Hostiles Defeated"},
-    {SurgeTimeLeft, "Surge Time Warning"},
-    {QueueForLeaseActivated, "Queue Activated"},
-    {QueueForLeaseExpired, "Queue Expired"},
-    {PermanentQueuePurchased, "Permanent Queue Purchased"},
-    {OutpostStartedOrEnded, "Outpost Update"},
-    {CrossAllianceArmadaVictory, "Cross-Armada Victory!"},
-    {CrossAllianceArmadaDefeat, "Cross-Armada Defeated"},
-    {CrossAllianceArmadaPartialVictory, "Cross-Armada Partial Victory"},
-    {FactionWeeklyEventsProgress, "Faction Weekly Event Progress"},
-    {FactionWeeklyEventsComplete, "Faction Weekly Event Complete"},
-    {ArmadaPlayerBlocked, "Armada Player Blocked"},
-    {ArmadaPlayerUnblocked, "Armada Player Unblocked"},
-    {DynamicCrisisUpdate, "Dynamic Crisis Update"},
-    {DynamicCrisisFailed, "Dynamic Crisis Failed"},
-    {DynamicCrisisCompleted, "Dynamic Crisis Completed"},
-    {GalacticAnomalySystemEntered, "Galactic Anomaly Entered"},
+constexpr std::pair<ToastState, const char*> kTitles[] = {
+    {ToastState::Standard, "Notification"},
+    {ToastState::FactionWarning, "Faction Warning"},
+    {ToastState::FactionLevelUp, "Faction Level Up"},
+    {ToastState::FactionLevelDown, "Faction Level Down"},
+    {ToastState::FactionDiscovered, "Faction Discovered"},
+    {ToastState::IncomingAttack, "Incoming Attack!"},
+    {ToastState::IncomingAttackFaction, "Incoming Faction Attack!"},
+    {ToastState::FleetBattle, "Fleet Battle"},
+    {ToastState::StationBattle, "Station Under Attack!"},
+    {ToastState::StationVictory, "Station Victory!"},
+    {ToastState::Victory, "Victory!"},
+    {ToastState::Defeat, "Defeat"},
+    {ToastState::StationDefeat, "Station Defeat"},
+    {ToastState::Tournament, "Event Progress"},
+    {ToastState::ArmadaCreated, "Armada Created"},
+    {ToastState::ArmadaCanceled, "Armada Canceled"},
+    {ToastState::ArmadaIncomingAttack, "Armada Under Attack!"},
+    {ToastState::ArmadaBattleWon, "Armada Victory!"},
+    {ToastState::ArmadaBattleLost, "Armada Defeated"},
+    {ToastState::DiplomacyUpdated, "Diplomacy Updated"},
+    {ToastState::JoinedTakeover, "Territory Capture Joined"},
+    {ToastState::CompetitorJoinedTakeover, "Competitor Joined Territory"},
+    {ToastState::AbandonedTerritory, "Territory Abandoned"},
+    {ToastState::TakeoverVictory, "Takeover Victory!"},
+    {ToastState::TakeoverDefeat, "Takeover Defeat"},
+    {ToastState::TreasuryProgress, "Treasury Progress"},
+    {ToastState::TreasuryFull, "Treasury Full"},
+    {ToastState::Achievement, "Achievement"},
+    {ToastState::AssaultVictory, "Assault Victory!"},
+    {ToastState::AssaultDefeat, "Assault Defeat"},
+    {ToastState::ChallengeComplete, "Challenge Complete"},
+    {ToastState::ChallengeFailed, "Challenge Failed"},
+    {ToastState::StrikeHit, "Strike Hit"},
+    {ToastState::StrikeDefeat, "Strike Defeat"},
+    {ToastState::WarchestProgress, "Warchest Progress"},
+    {ToastState::WarchestFull, "Warchest Full"},
+    {ToastState::PartialVictory, "Partial Victory"},
+    {ToastState::ArenaTimeLeft, "Arena Time Warning"},
+    {ToastState::ChainedEventScored, "Event Progress"},
+    {ToastState::FleetPresetApplied, "Fleet Preset Applied"},
+    {ToastState::SurgeWarmUpEnded, "Surge Started"},
+    {ToastState::SurgeHostileGroupDefeated, "Surge Hostiles Defeated"},
+    {ToastState::SurgeTimeLeft, "Surge Time Warning"},
+    {ToastState::QueueForLeaseActivated, "Queue Activated"},
+    {ToastState::QueueForLeaseExpired, "Queue Expired"},
+    {ToastState::PermanentQueuePurchased, "Permanent Queue Purchased"},
+    {ToastState::OutpostStartedOrEnded, "Outpost Update"},
+    {ToastState::CrossAllianceArmadaVictory, "Cross-Armada Victory!"},
+    {ToastState::CrossAllianceArmadaDefeat, "Cross-Armada Defeated"},
+    {ToastState::CrossAllianceArmadaPartialVictory, "Cross-Armada Partial Victory"},
+    {ToastState::FactionWeeklyEventsProgress, "Faction Weekly Event Progress"},
+    {ToastState::FactionWeeklyEventsComplete, "Faction Weekly Event Complete"},
+    {ToastState::ArmadaPlayerBlocked, "Armada Player Blocked"},
+    {ToastState::ArmadaPlayerUnblocked, "Armada Player Unblocked"},
+    {ToastState::DynamicCrisisUpdate, "Dynamic Crisis Update"},
+    {ToastState::DynamicCrisisFailed, "Dynamic Crisis Failed"},
+    {ToastState::DynamicCrisisCompleted, "Dynamic Crisis Completed"},
+    {ToastState::GalacticAnomalySystemEntered, "Galactic Anomaly Entered"},
 };
 
 // Indexed by Digit.PrimePlatform.Models.EventCategories.
@@ -121,21 +101,21 @@ constexpr const char* kEventCategories[] = {
 };
 
 // Toasts whose Data is an EventModel; their body is prefixed with the event's category.
-constexpr int kEventToasts[] = {
-    Achievement,      Tournament,   ChainedEventScored,          TreasuryProgress,           TreasuryFull,
-    WarchestProgress, WarchestFull, FactionWeeklyEventsProgress, FactionWeeklyEventsComplete};
+constexpr ToastState kEventToasts[] = {
+    ToastState::Achievement,      ToastState::Tournament,   ToastState::ChainedEventScored,          ToastState::TreasuryProgress,           ToastState::TreasuryFull,
+    ToastState::WarchestProgress, ToastState::WarchestFull, ToastState::FactionWeeklyEventsProgress, ToastState::FactionWeeklyEventsComplete};
 
 // Toasts whose Data is a BattleResultHeader.
-constexpr int kBattleToasts[] = {Victory,         Defeat,           PartialVictory, StationVictory,
-                                 StationDefeat,   StationBattle,    IncomingAttack, FleetBattle,
-                                 ArmadaBattleWon, ArmadaBattleLost, AssaultVictory, AssaultDefeat};
+constexpr ToastState kBattleToasts[] = {ToastState::Victory,         ToastState::Defeat,           ToastState::PartialVictory, ToastState::StationVictory,
+                                 ToastState::StationDefeat,   ToastState::StationBattle,    ToastState::IncomingAttack, ToastState::FleetBattle,
+                                 ToastState::ArmadaBattleWon, ToastState::ArmadaBattleLost, ToastState::AssaultVictory, ToastState::AssaultDefeat};
 
 constexpr BattleType kPvpBattles[] = {BattleType::Fleet,       BattleType::Base,      BattleType::ArmadaBase,
                                       BattleType::ArmadaAsb,   BattleType::ArmadaMta, BattleType::PvpCuttingBeam,
                                       BattleType::PvpChainShot};
 
-template <typename T, size_t N> bool Contains(const T (&list)[N], int value)
-{ return std::ranges::find(list, static_cast<T>(value)) != std::end(list); }
+template <typename T, size_t N> bool Contains(const T (&list)[N], T value)
+{ return std::ranges::find(list, value) != std::end(list); }
 
 // Toast data comes from a dozen game types whose layouts drift between builds. On Windows, an access violation
 // while reading one is contained and logged here instead of taking the game down.
@@ -189,7 +169,7 @@ std::string HullName(BattleResultHeader* header, int64_t hull_id)
 {
   if (hull_id == 0)
     return "";
-  auto* specs = static_cast<SpecService*>(header->get_SpecService());
+  auto* specs = header->specService();
   auto* hull  = specs ? specs->GetHull(hull_id) : nullptr;
   if (!hull)
     return fmt::format("Hull#{}", hull_id);
@@ -208,7 +188,7 @@ std::string HullName(BattleResultHeader* header, int64_t hull_id)
         return name;
     }
   }
-  auto* key = hull->Name();
+  auto* key = hull->name();
   return key ? toast_text::HullKeyName(to_string(key)) : fmt::format("Hull#{}", hull_id);
 }
 
@@ -219,23 +199,21 @@ std::string BattleBody(BattleResultHeader* header)
   bool        pvp = false;
 
   Guarded("the player profile", [&] {
-    auto* profile = static_cast<UserProfile*>(header->get_PlayerUserProfile());
-    if (profile && profile->Name())
-      player = to_string(profile->Name());
+    if (auto* profile = header->PlayerUserProfile())
+      player = to_string(profile->name());
   });
   Guarded("the enemy profile", [&] {
-    auto* profile = static_cast<UserProfile*>(header->get_EnemyUserProfile());
+    auto* profile = header->EnemyUserProfile();
     if (!profile)
       return;
-    if (profile->Name())
-      enemy = to_string(profile->Name());
+    enemy = to_string(profile->name());
     if (enemy.empty()) {
-      auto name = EnemyName(profile->LocaId());
+      auto name = EnemyName(profile->locaId());
       if (name != "Unknown")
         enemy = std::move(name);
     }
   });
-  Guarded("the battle type", [&] { pvp = Contains(kPvpBattles, header->get_BattleType()); });
+  Guarded("the battle type", [&] { pvp = Contains(kPvpBattles, header->BattleType()); });
   Guarded("the player hull",
           [&] { player_ship = toast_text::TitleCase(HullName(header, header->PlayerShipHullId())); });
   Guarded("the enemy hull", [&] { enemy_ship = toast_text::TitleCase(HullName(header, header->EnemyShipHullId())); });
@@ -250,35 +228,28 @@ std::string BattleBody(BattleResultHeader* header)
   return left + " vs " + right;
 }
 
-// Toast data types vary by toast, so fields resolve on the object's runtime class.
-template <il2cpp::Name Name, typename T> T Read(Il2CppObject* object)
-{ return object ? static_cast<il2cpp::Object*>(object)->Field<Name, T>() : T{}; }
-
-std::string ReadString(Il2CppString* text)
-{ return text ? to_string(text) : std::string{}; }
-
 // "[TAG] Owner started an Armada!\nLv.042 Target"
-std::string ArmadaCreatedBody(Il2CppObject* data)
+std::string ArmadaCreatedBody(ArmadaCreatedData* data)
 {
   std::string body;
   Guarded("armada data", [&] {
-    auto* attack   = Read<"ArmadaAttack", Il2CppObject*>(data);
-    auto* alliance = Read<"Alliance", Il2CppObject*>(data);
-    auto* owner    = Read<"<Owner>k__BackingField", Il2CppObject*>(attack);
-    auto* target   = Read<"<TargetUserProfile>k__BackingField", Il2CppObject*>(attack);
+    auto* attack   = data ? data->ArmadaAttack() : nullptr;
+    auto* alliance = data ? data->Alliance() : nullptr;
+    auto* owner    = attack ? attack->Owner() : nullptr;
+    auto* target   = attack ? attack->TargetUserProfile() : nullptr;
 
-    const auto tag         = ReadString(Read<"tag_", Il2CppString*>(alliance));
-    auto       owner_name  = ReadString(Read<"name_", Il2CppString*>(owner));
-    auto       target_name = ReadString(Read<"name_", Il2CppString*>(target));
-    if (target_name.empty())
-      target_name = EnemyName(Read<"_locaId", int64_t>(target));
+    const auto tag         = alliance ? to_string(alliance->tag()) : std::string{};
+    auto       owner_name  = owner ? to_string(owner->name()) : std::string{};
+    auto       target_name = target ? to_string(target->name()) : std::string{};
+    if (target_name.empty() && target)
+      target_name = EnemyName(target->locaId());
     if (owner_name.empty())
       owner_name = "An alliance member";
     if (target_name.empty() || target_name == "Unknown")
       target_name = "Armada target";
 
     const auto owner_label = tag.empty() ? owner_name : fmt::format("[{}] {}", tag, owner_name);
-    const auto level       = Read<"<TargetLevel>k__BackingField", int32_t>(attack);
+    const auto level       = attack ? attack->TargetLevel() : 0;
     body                   = fmt::format("{} started an Armada!\nLv.{:03} {}", owner_label, level, target_name);
   });
   return body;
@@ -292,14 +263,9 @@ std::vector<std::string> ParameterValues(il2cpp::Array<Il2CppObject*>* parameter
     auto*         element = (*parameters)[i];
     Il2CppString* text    = nullptr;
     if (element) {
-      Guarded("a text parameter", [&] {
-        auto* name = il2cpp_class_get_name(il2cpp_object_get_class(element));
-        text       = name && std::strcmp(name, "String") == 0
-                         ? reinterpret_cast<Il2CppString*>(element)
-                         : static_cast<il2cpp::Object*>(element)->Call<"ToString", Il2CppString*>();
-      });
+      Guarded("a text parameter", [&] { text = TextOf(static_cast<il2cpp::Object*>(element)); });
     }
-    values.push_back(ReadString(text));
+    values.push_back(to_string(text));
   }
   return values;
 }
@@ -335,7 +301,7 @@ std::string FormatFromArrayFields(const std::string& text, Il2CppObject* object,
 // Fills placeholders from Toast.TextParameters, or failing that from any array on the toast or its text context.
 std::string FormatToastText(const std::string& text, Toast* toast, LocaleTextContext* context)
 {
-  if (auto* parameters = toast->get_TextParameters(); parameters && parameters->size() > 0)
+  if (auto* parameters = toast->TextParameters(); parameters && parameters->size() > 0)
     return FormatPlaceholders(text, ParameterValues(parameters));
 
   std::string fields_seen;
@@ -351,9 +317,9 @@ std::string FormatToastText(const std::string& text, Toast* toast, LocaleTextCon
 // The toast's own localized text with its parameters filled in.
 std::string ToastText(Toast* toast)
 {
-  auto* context = static_cast<LocaleTextContext*>(toast->get_TextLocaleTextContext());
+  auto* context = toast->TextLocaleTextContext();
   if (!context) {
-    spdlog::debug("[Notify] No TextLocaleTextContext for toast state {}", toast->get_State());
+    spdlog::debug("[Notify] No TextLocaleTextContext for toast state {}", static_cast<int>(toast->State()));
     return {};
   }
 
@@ -366,7 +332,7 @@ std::string ToastText(Toast* toast)
   Il2CppString* text    = nullptr;
   auto*         manager = LanguageManager::Instance();
   if (!manager || !manager->Localize(text, context) || !text) {
-    spdlog::debug("[Notify] toast state {} could not be localized", toast->get_State());
+    spdlog::debug("[Notify] toast state {} could not be localized", static_cast<int>(toast->State()));
     return {};
   }
   return FormatToastText(to_string(text), toast, context);
@@ -374,8 +340,8 @@ std::string ToastText(Toast* toast)
 
 std::string EventCategory(Toast* toast)
 {
-  auto*      data     = toast->get_Data();
-  auto*      event    = data ? static_cast<il2cpp::Object*>(data)->As<EventModel>() : nullptr;
+  auto*      data     = toast->Data();
+  auto*      event    = data ? data->As<EventModel>() : nullptr;
   const auto category = event ? event->category() : -1;
   return category >= 0 && category < static_cast<int32_t>(std::size(kEventCategories)) ? kEventCategories[category]
                                                                                        : "";
@@ -383,14 +349,13 @@ std::string EventCategory(Toast* toast)
 
 std::string NotificationBody(Toast* toast)
 {
-  const auto  state = toast->get_State();
+  const auto  state = toast->State();
+  auto*       data  = toast->Data();
   std::string body;
-  if (state == ArmadaCreated)
-    body = ArmadaCreatedBody(toast->get_Data());
-  else if (Contains(kBattleToasts, state))
-    if (auto* header =
-            toast->get_Data() ? static_cast<il2cpp::Object*>(toast->get_Data())->As<BattleResultHeader>() : nullptr)
-      body = BattleBody(header);
+  if (state == ToastState::ArmadaCreated)
+    body = ArmadaCreatedBody(static_cast<ArmadaCreatedData*>(data));
+  else if (auto* header = data && Contains(kBattleToasts, state) ? data->As<BattleResultHeader>() : nullptr)
+    body = BattleBody(header);
   if (body.empty())
     body = toast_text::StripRichText(ToastText(toast));
   if (body.empty())
@@ -438,13 +403,13 @@ void ShowWindowsNotification(const char* title, const std::string& body)
 void Notify(Toast* toast)
 {
 #if _WIN32
-  const auto  state = toast->get_State();
+  const auto  state = toast->State();
   const auto& types = Config::Get().ui.notify_banner_types;
-  if (std::ranges::find(types, state) == types.end())
+  if (std::ranges::find(types, static_cast<int>(state)) == types.end())
     return;
-  const auto title = std::ranges::find(kTitles, state, &std::pair<int, const char*>::first);
+  const auto title = std::ranges::find(kTitles, state, &std::pair<ToastState, const char*>::first);
   if (title == std::end(kTitles)) {
-    spdlog::debug("[Notify] No title mapping for toast state {}, skipping", state);
+    spdlog::debug("[Notify] No title mapping for toast state {}, skipping", static_cast<int>(state));
     return;
   }
   ShowWindowsNotification(title->second, NotificationBody(toast));
@@ -457,13 +422,13 @@ void Notify(Toast* toast)
 bool ShowBanner(Toast* toast)
 {
   if (toast)
-    notification_audio_play(Config::Get().NotificationSoundForToast(static_cast<int>(toast->get_State())));
+    notification_audio_play(Config::Get().NotificationSoundForToast(static_cast<int>(toast->State())));
   const auto& ui = Config::Get().ui;
   if (!toast || (ui.disabled_banner_types.empty() && ui.notify_banner_types.empty()))
     return true;
   Notify(toast);
   const auto& disabled = Config::Get().ui.disabled_banner_types;
-  return std::ranges::find(disabled, toast->get_State()) == disabled.end();
+  return std::ranges::find(disabled, static_cast<int>(toast->State())) == disabled.end();
 }
 
 void ToastObserver_EnqueueToast_Hook(auto original, ToastObserver* _this, Toast* toast)
@@ -479,7 +444,7 @@ void ToastObserver_EnqueueOrCombineToast_Hook(auto original, ToastObserver* _thi
 }
 } // namespace
 
-void InstallToastBannerHooks()
+void InstallToasts()
 {
 
   if (auto m = ToastObserver::Class::Method("EnqueueToast"))

@@ -2,7 +2,7 @@
 
 // Keyboard and mouse state from Unity's legacy Input API.
 
-#include <prime/KeyCode.h>
+#include "prime/KeyCode.h"
 
 namespace Key
 {

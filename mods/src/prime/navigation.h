@@ -2,10 +2,10 @@
 
 // System and galaxy navigation: camera zoom and pan, LOD, sections, bookmarks, course prompts.
 
-#include "Hub.h"
-#include "fleet.h"
-#include "ui.h"
-#include "unity.h"
+#include "prime/Hub.h"
+#include "prime/fleet.h"
+#include "prime/ui.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -29,16 +29,10 @@ struct NavigationLOD : il2cpp::Object {
   { SetField<"<TargetLevel>k__BackingField">(level); }
 };
 
-#pragma pack(push, 1)
-struct vec3 {
-  float x, y, z;
-};
-#pragma pack(pop)
-
 struct NavigationPan : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationPan">;
 
-  void MoveCamera(vec2 delta, bool isMomentum = false)
+  void MoveCamera(Vector2 delta, bool isMomentum = false)
   { Call<"MoveCamera">(delta, isMomentum); }
 
   static bool BlockPan()
@@ -69,11 +63,17 @@ enum class NodeDepth : int32_t {
   Starbase     = 8,
 };
 
+struct MathUtils {
+  using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.Client.Core", "MathUtils">;
+
+  // The world point under the screen position `mouse`, as seen by `camera`.
+  static Vector3 GetMouseWorldPos(Camera* camera, Vector3 mouse)
+  { return Class::Call<"GetMouseWorldPos", Vector3>(camera, mouse); }
+};
+
 struct NavigationZoom : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationZoom">;
 
-  void SetViewParameters(float radius, NodeDepth depth)
-  { Call<"SetViewParameters">(radius, depth); }
   void ZoomCameraAtWorldPoint()
   { Call<"ZoomCameraAtWorldPoint">(); }
 
@@ -86,8 +86,6 @@ struct NavigationZoom : il2cpp::Object {
 
   NodeDepth depth()
   { return Field<"_depth", NodeDepth>(); }
-  void SetDepth(NodeDepth value)
-  { SetField<"_depth">(value); }
   ZoomLevels zoomLevel()
   { return Field<"_zoomLevel", ZoomLevels>(); }
   Camera* sceneCamera()
@@ -107,13 +105,9 @@ struct NavigationZoom : il2cpp::Object {
   { return Field<"_viewRadius", float>(); }
   void SetLastZoomDelta(float value)
   { SetField<"_lastZoomDelta">(value); }
-  vec2 zoomLocation()
-  { return Field<"_zoomLocation", vec2>(); }
-  void SetZoomLocation(vec2 value)
+  void SetZoomLocation(Vector2 value)
   { SetField<"_zoomLocation">(value); }
-  vec3 worldPoint()
-  { return Field<"_worldPoint", vec3>(); }
-  void SetWorldPoint(vec3 value)
+  void SetWorldPoint(Vector3 value)
   { SetField<"_worldPoint">(value); }
   void SetFarRatioSystemNormal(float value)
   { SetField<"_farRatioSystemNormal">(value); }
@@ -196,9 +190,9 @@ struct OrbitFrameProvider : il2cpp::Object {
 struct PlanetViewUtils : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "PlanetViewUtils">;
 
-  // Managed FlatRenderable. Calling this also runs any detour on get_FlatRenderable.
-  void* GetFlatRenderable()
-  { return Get<"FlatRenderable", void*>(); }
+  // The planet's 2D sprite, a Component. Calling this also runs any detour on get_FlatRenderable.
+  Component* FlatRenderable()
+  { return static_cast<Component*>(Get<"FlatRenderable", Il2CppObject*>()); }
 };
 
 struct CoordinateSearchContext : il2cpp::Object {
@@ -231,7 +225,7 @@ struct BookmarksManager : MonoSingleton<BookmarksManager> {
     context->SetDefaultXCoordinate(zero);
     context->SetDefaultYCoordinate(zero);
     context->SetDefaultSystemInput(il2cpp_string_new(""));
-    Hub::get_SectionManager()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false,
+    Hub::Sections()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false,
                                                     true);
   }
 };
@@ -254,7 +248,7 @@ struct CoursePromptPopupWidget : Widget<CoursePromptPopupDataContext> {
   { Call<"OnInstantWarpButtonClick">(); }
 };
 
-struct CoursePromptPopupViewController : ViewController<CoursePromptPopupDataContext> {
+struct CoursePromptPopupViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.ObjectViewer", "CoursePromptPopupViewController">;
 
   CoursePromptPopupWidget* PopupWidget()

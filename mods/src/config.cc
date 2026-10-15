@@ -6,7 +6,7 @@
 #include "str_utils.h"
 #include "version.h"
 
-#include <prime/ui.h>
+#include "prime/ui.h"
 
 #include <spdlog/spdlog.h>
 #include <toml++/toml.h>
@@ -257,7 +257,7 @@ std::vector<int> ReadBannerTypes(Reader& reader, std::string_view key)
   for (const auto& [name, state] : kBannerTypes) {
     if (!all && std::erase(wanted, AsciiStrToUpper(name)) == 0)
       continue;
-    types.push_back(state);
+    types.push_back(static_cast<int>(state));
     names += names.empty() ? "" : ", ";
     names += name;
   }

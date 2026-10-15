@@ -8,9 +8,9 @@
 
 #include <Digit.PrimeServer.Models.pb.h>
 #include <google/protobuf/repeated_field.h>
-#include <prime/Hub.h>
-#include <prime/server.h>
-#include <prime/UserProfileManager.h>
+#include "prime/Hub.h"
+#include "prime/server.h"
+#include "prime/UserProfileManager.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/fmt/fmt.h>
@@ -951,41 +951,41 @@ namespace
   }
 
   struct Route {
-    EntityGroup::Type type;
+    EntityGroup::Kind type;
     void (*process)(const std::string& bytes);
     // The category that must be enabled; null for the JSON responses, which check their own sections.
     bool SyncConfig::* option;
   };
 
   const Route kRoutes[] = {
-      {EntityGroup::Type::AwayAssignmentsList, ProcessAwayAssignments, &SyncConfig::away_assignments},
-      {EntityGroup::Type::AwayAssignmentsInstance, ProcessAwayAssignment, &SyncConfig::away_assignments},
-      {EntityGroup::Type::BattleResultHeaders, ProcessBattleHeaders, &SyncConfig::battlelogs},
-      {EntityGroup::Type::UserProfiles, CachePlayerNames, &SyncConfig::battlelogs},
-      {EntityGroup::Type::AllianceProfiles, CacheAllianceNames, &SyncConfig::battlelogs},
-      {EntityGroup::Type::GlobalActiveBuffs, ProcessBuffs, &SyncConfig::buffs},
-      {EntityGroup::Type::AllianceGetGameProperties, ProcessAllianceGameProperties, &SyncConfig::buffs},
-      {EntityGroup::Type::StarbaseModules, ProcessStarbaseModules, &SyncConfig::buildings},
-      {EntityGroup::Type::PlanetaryBaseData, ProcessHavenBase, &SyncConfig::haven},
-      {EntityGroup::Type::PlanetaryMapResponse, ProcessHavenMapResponse, &SyncConfig::haven},
-      {EntityGroup::Type::PlanetaryMapData, ProcessHavenMap, &SyncConfig::haven},
-      {EntityGroup::Type::PlanetaryMapProsperity, ProcessHavenProsperity, &SyncConfig::haven},
-      {EntityGroup::Type::PlayerInventories, ProcessInventory, &SyncConfig::inventory},
-      {EntityGroup::Type::Jobs, ProcessJobs, &SyncConfig::jobs},
-      {EntityGroup::Type::ActiveMissions, ProcessActiveMissions, &SyncConfig::missions},
-      {EntityGroup::Type::CompletedMissions, ProcessCompletedMissions, &SyncConfig::missions},
-      {EntityGroup::Type::Officers, ProcessOfficers, &SyncConfig::officers},
-      {EntityGroup::Type::ResearchTreesState, ProcessResearch, &SyncConfig::research},
-      {EntityGroup::Type::Resources, ProcessResources, &SyncConfig::resources},
-      {EntityGroup::Type::ResourcesDelta, ProcessResourcesDelta, &SyncConfig::resources},
-      {EntityGroup::Type::AllianceGetBankResources, ProcessAllianceResources, &SyncConfig::resources},
-      {EntityGroup::Type::ResourcesDeltaAlliance, ProcessAllianceResourcesDelta, &SyncConfig::resources},
-      {EntityGroup::Type::Ships, ProcessShips, &SyncConfig::ships},
-      {EntityGroup::Type::EntitySlots, ProcessEntitySlots, &SyncConfig::slots},
-      {EntityGroup::Type::EntitySlotsData, ProcessEntitySlotsData, &SyncConfig::slots},
-      {EntityGroup::Type::ForbiddenTechs, ProcessForbiddenTech, &SyncConfig::tech},
-      {EntityGroup::Type::ActiveOfficerTraits, ProcessOfficerTraits, &SyncConfig::traits},
-      {EntityGroup::Type::Json, ProcessJson, nullptr},
+      {EntityGroup::Kind::AwayAssignmentsList, ProcessAwayAssignments, &SyncConfig::away_assignments},
+      {EntityGroup::Kind::AwayAssignmentsInstance, ProcessAwayAssignment, &SyncConfig::away_assignments},
+      {EntityGroup::Kind::BattleResultHeaders, ProcessBattleHeaders, &SyncConfig::battlelogs},
+      {EntityGroup::Kind::UserProfiles, CachePlayerNames, &SyncConfig::battlelogs},
+      {EntityGroup::Kind::AllianceProfiles, CacheAllianceNames, &SyncConfig::battlelogs},
+      {EntityGroup::Kind::GlobalActiveBuffs, ProcessBuffs, &SyncConfig::buffs},
+      {EntityGroup::Kind::AllianceGetGameProperties, ProcessAllianceGameProperties, &SyncConfig::buffs},
+      {EntityGroup::Kind::StarbaseModules, ProcessStarbaseModules, &SyncConfig::buildings},
+      {EntityGroup::Kind::PlanetaryBaseData, ProcessHavenBase, &SyncConfig::haven},
+      {EntityGroup::Kind::PlanetaryMapResponse, ProcessHavenMapResponse, &SyncConfig::haven},
+      {EntityGroup::Kind::PlanetaryMapData, ProcessHavenMap, &SyncConfig::haven},
+      {EntityGroup::Kind::PlanetaryMapProsperity, ProcessHavenProsperity, &SyncConfig::haven},
+      {EntityGroup::Kind::PlayerInventories, ProcessInventory, &SyncConfig::inventory},
+      {EntityGroup::Kind::Jobs, ProcessJobs, &SyncConfig::jobs},
+      {EntityGroup::Kind::ActiveMissions, ProcessActiveMissions, &SyncConfig::missions},
+      {EntityGroup::Kind::CompletedMissions, ProcessCompletedMissions, &SyncConfig::missions},
+      {EntityGroup::Kind::Officers, ProcessOfficers, &SyncConfig::officers},
+      {EntityGroup::Kind::ResearchTreesState, ProcessResearch, &SyncConfig::research},
+      {EntityGroup::Kind::Resources, ProcessResources, &SyncConfig::resources},
+      {EntityGroup::Kind::ResourcesDelta, ProcessResourcesDelta, &SyncConfig::resources},
+      {EntityGroup::Kind::AllianceGetBankResources, ProcessAllianceResources, &SyncConfig::resources},
+      {EntityGroup::Kind::ResourcesDeltaAlliance, ProcessAllianceResourcesDelta, &SyncConfig::resources},
+      {EntityGroup::Kind::Ships, ProcessShips, &SyncConfig::ships},
+      {EntityGroup::Kind::EntitySlots, ProcessEntitySlots, &SyncConfig::slots},
+      {EntityGroup::Kind::EntitySlotsData, ProcessEntitySlotsData, &SyncConfig::slots},
+      {EntityGroup::Kind::ForbiddenTechs, ProcessForbiddenTech, &SyncConfig::tech},
+      {EntityGroup::Kind::ActiveOfficerTraits, ProcessOfficerTraits, &SyncConfig::traits},
+      {EntityGroup::Kind::Json, ProcessJson, nullptr},
   };
 
   // Runs on the game thread: copies the bytes out and leaves the work to the processing thread.
@@ -997,7 +997,7 @@ namespace
 
     // Checked per response rather than at install, so targets and categories can change at runtime. Without a
     // wanted category nothing is copied or parsed.
-    const auto  route   = std::ranges::find(kRoutes, entity_group->Type_(), &Route::type);
+    const auto  route   = std::ranges::find(kRoutes, entity_group->Type(), &Route::type);
     const auto& options = Config::Get().sync.options;
     if (route == std::end(kRoutes)
         || !(route->option ? options.*route->option
@@ -1007,21 +1007,6 @@ namespace
                                               static_cast<size_t>(group->Length()))});
   }
 
-  using GameServerModelRegistry =
-      il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServerModelRegistry">;
-  using GameServer = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServer">;
-  using SlotAssignRtcParser =
-      il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotAssignRtcParser">;
-  using SlotClearRtcParser =
-      il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotClearRtcParser">;
-
-  // IL2CPP value type: keep this parameter by value so following arguments retain their platform ABI positions.
-  struct CentrifugoInfo {
-    Il2CppString* Channel;
-    int32_t       Offset;
-  };
-  static_assert(sizeof(CentrifugoInfo) == 16);
-
   void* RtcParser_ParseFinalPayload(auto original, void* _this, CentrifugoInfo centrifugoInfo,
                                     RealtimeDataPayload* realtimeDataPayload, void* finalPayload)
   {
@@ -1029,7 +1014,6 @@ namespace
         && realtimeDataPayload->DataType() && realtimeDataPayload->Data()) {
       // DataType arrives as a number in a string; JSON is "0". This runs inside the game's parser, so nothing here
       // may throw.
-      static_assert(DataType::JSON == 0);
       const auto* type = realtimeDataPayload->DataType();
       if (type->length == 1 && type->chars[0] == u'0')
         pending.Push({ProcessRealtimeSlot, to_string(realtimeDataPayload->Data())});
@@ -1073,7 +1057,7 @@ namespace
 } // namespace
 } // namespace data_sync
 
-void InstallSyncPatches()
+void InstallSync()
 {
   using namespace data_sync;
 

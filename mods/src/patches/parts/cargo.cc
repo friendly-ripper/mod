@@ -4,7 +4,8 @@
 #include "config.h"
 #include "patches/patches.h"
 
-#include <prime/ui.h>
+#include "prime/server.h"
+#include "prime/ui.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -30,24 +31,6 @@ void ColourTextLocalizer_SetLocalTextParameters_Hook(auto original, ColourTextLo
 }
 
 #if defined(_WIN32) && defined(_M_X64)
-using CargoProgressData =
-    il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Models", "CargoProgressData">;
-
-// Fields below are declared on LegacyProgressBar and Widget`1; lookups walk the parents.
-struct LegacyComparableProgressBar : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Stats", "LegacyComparableProgressBar">;
-
-  TextLocalizer* currentValue_X_of_Y()
-  { return Field<"_currentValue_X_of_Y", TextLocalizer*>(); }
-  // IProgressData
-  il2cpp::Object* context()
-  { return Field<"m_context", il2cpp::Object*>(); }
-  bool snapToValue()
-  { return Field<"_snapToValue", bool>(); }
-  void SetSnapToValue(bool value)
-  { SetField<"_snapToValue">(value); }
-};
-
 bool IsCargoText(LegacyComparableProgressBar* self)
 {
   auto* label = self->currentValue_X_of_Y();
@@ -82,7 +65,7 @@ void SetWidgetData_Hook(auto original, LegacyComparableProgressBar* self)
 #endif
 } // namespace
 
-void InstallCargoFormatHooks()
+void InstallCargoFormat()
 {
   if (auto method = ColourTextLocalizer::Class::Method("SetLocalTextParameters")) {
     SPUD_STATIC_DETOUR(method.Pointer(), ColourTextLocalizer_SetLocalTextParameters_Hook);
@@ -90,7 +73,7 @@ void InstallCargoFormatHooks()
   }
 }
 
-void InstallInstantCargoCounterHooks()
+void InstallInstantCargo()
 {
   // TODO: Windows x64 only. Enabling it on macOS needs SetWidgetData's prologue checked against SPUD's detour size.
 #if defined(_WIN32) && defined(_M_X64)

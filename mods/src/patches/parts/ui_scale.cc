@@ -5,9 +5,9 @@
 #include "patches/patches.h"
 #include "str_utils.h"
 
-#include <prime/fleet.h>
-#include <prime/ui.h>
-#include <prime/unity.h>
+#include "prime/fleet.h"
+#include "prime/ui.h"
+#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
@@ -37,7 +37,7 @@ void RescaleLoadedShips(float old_multiplier, float new_multiplier)
   const auto ratio = new_multiplier / old_multiplier;
   for (auto* selector : ObjectFinder<FleetMeshSelector>::GetAll()) {
     auto* object    = selector ? selector->LoadedObject() : nullptr;
-    auto* transform = object ? object->Get<"transform", Transform*>() : nullptr;
+    auto* transform = object ? object->transform() : nullptr;
     if (!transform)
       continue;
     const auto scale = transform->localScale();
@@ -70,9 +70,8 @@ void ScreenManager_UpdateCanvasRootScaleFactor_Hook(auto original, ScreenManager
 
   auto factor = ui_scale * WindowDpiScale();
   factor      = std::isnan(factor) ? 1.0f : std::clamp(factor, 0.1f, 5.0f);
-  // Property setter, not the managed SetScaleFactor method; the scaler applies it on its next Update.
   if (auto* scaler = _this->canvasRootScaler())
-    scaler->set_scaleFactor(factor);
+    scaler->SetScaleFactor(factor);
 }
 
 void CanvasController_Show(auto original, CanvasController* _this, int desiredEntryPoint, bool instant)
@@ -124,10 +123,8 @@ void AdjustUiShipScale(bool up)
   RescaleLoadedShips(old_scale, config.graphics.ui_scale_ship);
 }
 
-void InstallUiScaleHooks()
+void InstallUiScale()
 {
-  using SystemViewShip = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "SystemViewShip">;
-
   if (auto method = SystemViewShip::Method("TryGetShipAssetBundleResource", 2))
     SPUD_STATIC_DETOUR(method.Pointer(), SystemViewShip_TryGetShipAssetBundleResource_Hook);
 
