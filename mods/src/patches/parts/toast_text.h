@@ -89,19 +89,6 @@ inline std::string HullKeyName(std::string_view key)
   std::ranges::replace(name, '_', ' ');
   if (name.size() >= 2 && name[0] == 'L' && name[1] >= '0' && name[1] <= '9')
     name = "Lv." + name.substr(1);
-  // Title case per word, leaving the "Lv." prefix and digits alone.
-  bool word_start = true;
-  for (auto& c : name) {
-    const bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    if (letter && word_start) {
-      c          = static_cast<char>(c >= 'a' ? c - 'a' + 'A' : c);
-      word_start = false;
-    } else if (letter) {
-      c = static_cast<char>(c <= 'Z' ? c - 'A' + 'a' : c);
-    }
-    if (c == ' ')
-      word_start = true;
-  }
-  return name;
+  return TitleCase(std::move(name));
 }
 } // namespace toast_text
