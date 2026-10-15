@@ -16,7 +16,7 @@ pub fn abseil(ctx: *const Ctx) Lib {
     const module = ctx.createModule(true);
     module.addIncludePath(src);
     if (ctx.isMacos()) module.linkFramework("CoreFoundation", .{});
-    module.addCSourceFiles(.{ .root = src, .files = &abseil_sources, .flags = ctx.cxxFlags("c++17", &.{}) });
+    addRuntimeSources(ctx, module, "abseil", src, &abseil_sources);
     return .{ .artifact = ctx.staticLib("abseil", module), .include_dirs = ctx.dirs(&.{src}) };
 }
 
@@ -28,7 +28,7 @@ pub fn protobufLite(ctx: *const Ctx, absl: Lib) Lib {
     module.addIncludePath(src.path(b, "src"));
     module.addIncludePath(src.path(b, "third_party/utf8_range"));
     absl.linkInto(module);
-    module.addCSourceFiles(.{ .root = src, .files = &protobuf_sources, .flags = ctx.cxxFlags("c++17", &.{}) });
+    addRuntimeSources(ctx, module, "protobuf", src, &protobuf_sources);
     module.addCSourceFiles(.{
         .root = src,
         .files = &.{"third_party/utf8_range/utf8_range.c"},
@@ -79,4 +79,23 @@ pub fn generate(ctx: *const Ctx, runtime: Lib) ?Lib {
         .artifact = ctx.staticLib("stfc-proto", module),
         .include_dirs = ctx.dirs(&.{generated}),
     };
+}
+
+/// On macOS, compile runtime sources in batches of four so they share header parsing without serializing the
+/// library into one unit. Other targets keep one unit per file: MSVC headers and source-local CRT defines depend
+/// on include order.
+fn addRuntimeSources(
+    ctx: *const Ctx,
+    module: *std.Build.Module,
+    name: []const u8,
+    root: std.Build.LazyPath,
+    sources: []const []const u8,
+) void {
+    const flags = ctx.cxxFlags("c++17", &.{});
+    if (!ctx.isMacos()) return module.addCSourceFiles(.{ .root = root, .files = sources, .flags = flags });
+    var offset: usize = 0;
+    while (offset < sources.len) : (offset += 4) {
+        const batch = sources[offset..@min(offset + 4, sources.len)];
+        ctx.addCxxBatch(module, ctx.b.fmt("{s}-{d}", .{ name, offset / 4 }), root, batch, flags);
+    }
 }
