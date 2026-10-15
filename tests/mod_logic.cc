@@ -115,6 +115,12 @@ void ToastText()
   Check(FormatPlaceholders("{10} and {1}", values) == "{10} and 7", "{1} does not match {10}");
   Check(FormatPlaceholders("{2} stays", values) == "{2} stays", "empty values are left alone");
   Check(FormatPlaceholders("{1:x2}", values) == "7", "other formats are filled unpadded");
+  const std::vector<std::string> literal_values{"{1}", "Enterprise"};
+  Check(FormatPlaceholders("{0} vs {1}", literal_values) == "{1} vs Enterprise",
+        "replacement text stays literal instead of being interpreted as another placeholder");
+  Check(FormatPlaceholders("{00} {+1} {99999999999999999999999999} {0", values)
+            == "{00} {+1} {99999999999999999999999999} {0",
+        "malformed, overflowing and unclosed placeholders remain unchanged");
   Check(StripRichText("<color=#FF0000>Red</color> <b>bold</b>") == "Red bold", "rich text tags removed");
   Check(StripRichText("a < b") == "a < b", "an unclosed '<' is text");
   Check(TitleCase("USS ENTERPRISE-D") == "Uss Enterprise-D", "title case");
