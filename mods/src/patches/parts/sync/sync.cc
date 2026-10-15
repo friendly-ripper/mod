@@ -7,6 +7,7 @@
 #include "str_utils.h"
 
 #include <Digit.PrimeServer.Models.pb.h>
+#include <google/protobuf/repeated_field.h>
 #include <prime/Hub.h>
 #include <prime/server.h>
 #include <prime/UserProfileManager.h>
@@ -16,7 +17,6 @@
 #include <spud/detour.h>
 
 #include <algorithm>
-#include <atomic>
 #include <charconv>
 #include <cmath>
 #include <optional>
@@ -26,6 +26,17 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+NLOHMANN_JSON_NAMESPACE_BEGIN
+template <typename T> struct adl_serializer<google::protobuf::RepeatedField<T>> {
+  static void to_json(json& j, const google::protobuf::RepeatedField<T>& proto)
+  {
+    j = json::array();
+    for (const auto& v : proto)
+      j.push_back(v);
+  }
+};
+NLOHMANN_JSON_NAMESPACE_END
 
 namespace data_sync
 {
@@ -43,7 +54,7 @@ namespace
     std::string bytes;
   };
 
-  BoundedQueue<Job> pending{"processing", kJobQueueCapacity};
+  auto& pending = *new BoundedQueue<Job>{"processing", kJobQueueCapacity};
 
   struct PairHash {
     template <typename T, typename U> size_t operator()(const std::pair<T, U>& pair) const
@@ -122,7 +133,7 @@ namespace
   }
 
   void Trace(std::string_view what, size_t count)
-  { logging::trace("PROCESS", what, fmt::format("Processing {}", count)); }
+  { logging::trace("PROCESS", what, "Processing {}", count); }
 
   // Officers and forbidden tech: rank or tier, level, shards.
   using RankLevelShards = std::tuple<int32_t, int32_t, int32_t>;
@@ -141,29 +152,34 @@ namespace
     }
   };
 
-  SentState<int64_t, int64_t>                               modules, resources, alliance_resources, slots;
-  SentState<int64_t, int64_t> haven_pieces;
+  // Everything the processing thread remembers about this session. A new login starts it over.
+  struct SentData {
+    SentState<int64_t, int64_t>                               modules, resources, alliance_resources, slots;
+    SentState<int64_t, int64_t> haven_pieces;
     SentState<int64_t, std::tuple<int32_t, int32_t, int64_t>> haven_map_buildings;
-  SentState<int64_t, std::pair<int32_t, int64_t>>           buffs;
-  SentState<std::pair<int32_t, int64_t>, int64_t, PairHash> inventory;
-  SentState<std::string, bool>                              active_jobs;
-  SentState<uint64_t, RankLevelShards>                      officers, techs;
-  SentState<int64_t, int32_t>                               research;
-  SentState<std::pair<int64_t, int64_t>, int32_t, PairHash> traits;
-  SentState<int64_t, ShipState>                             ships;
-  SentState<int64_t, size_t>                                away_assignments;
-  std::unordered_set<int64_t>                               active_missions, completed_missions;
-  int32_t                                                   emerald_chain_level = -1;
-  // The protobuf and JSON resource lists are flagged separately, as two different first uploads.
-  FirstSync first_away_assignments, first_buffs, first_inventory, first_jobs, first_resources, first_json_resources,
-      first_alliance_resources, first_ships;
+    SentState<int64_t, std::pair<int32_t, int64_t>>           buffs;
+    SentState<std::pair<int32_t, int64_t>, int64_t, PairHash> inventory;
+    SentState<std::string, bool>                              active_jobs;
+    SentState<uint64_t, RankLevelShards>                      officers, techs;
+    SentState<int64_t, int32_t>                               research;
+    SentState<std::pair<int64_t, int64_t>, int32_t, PairHash> traits;
+    SentState<int64_t, ShipState>                             ships;
+    SentState<int64_t, size_t>                                away_assignments;
+    std::unordered_set<int64_t>                               active_missions, completed_missions;
+    // The first active mission list of a session is always sent, even empty, so a target can drop stale ones.
+    bool    active_missions_sent = false;
+    int32_t emerald_chain_level  = -1;
+    // The protobuf and JSON resource lists are flagged separately, as two different first uploads.
+    FirstSync first_away_assignments, first_buffs, first_inventory, first_jobs, first_resources, first_json_resources,
+        first_alliance_resources, first_ships;
+    // Haven data is sent once per session.
+    bool haven_base = false, haven_map = false, haven_prosperity = false;
+  };
+  // Processing thread only, so not locked. Never destroyed, see sync.h.
+  auto& sent = *new SentData;
 
-  // Haven data is synced once per session. The flags are set when a response is processed, not when one is
-  // queued, so a response dropped from a full queue is retried by the next one. Two copies queued before the
-  // first is processed are both sent, which only happens in a burst at login.
-  std::atomic_bool haven_base_synced{false};
-  std::atomic_bool haven_map_synced{false};
-  std::atomic_bool haven_prosperity_synced{false};
+  void StartNewSession(const std::string&)
+  { sent = SentData{}; }
 
   // An away assignment is compared by a hash of its whole record: officers, state and job.
   void AddAwayAssignment(Batch& batch, const pb::AwayAssignmentInstance& instance)
@@ -207,7 +223,7 @@ namespace
                 {"attack_weight", instance.attackweight()},
                 {"defense_weight", instance.defenseweight()},
                 {"health_weight", instance.healthweight()}};
-    if (away_assignments.Changed(instance.id(), std::hash<json>{}(record)))
+    if (sent.away_assignments.Changed(instance.id(), std::hash<json>{}(record)))
       batch.Add(std::move(record));
   }
 
@@ -225,10 +241,10 @@ namespace
       present.insert(instance.id());
       AddAwayAssignment(batch, instance);
     }
-    away_assignments.Prune(present, [&](int64_t id) {
+    sent.away_assignments.Prune(present, [&](int64_t id) {
       batch.Add({{"type", "collected_" + SyncConfig::Type::AwayAssignments}, {"aid", id}});
     });
-    batch.Send(&first_away_assignments);
+    batch.Send(&sent.first_away_assignments);
   }
 
   // One assignment as it starts: first ready to start with its officers set, then in progress with its job.
@@ -237,7 +253,7 @@ namespace
     auto instance = Parse<pb::AwayAssignmentInstance>(bytes, "away assignment instance");
     if (!instance)
       return;
-    logging::trace("PROCESS", "away assignment", fmt::format("Processing away assignment {}", instance->id()));
+    logging::trace("PROCESS", "away assignment", "Processing away assignment {}", instance->id());
 
     Batch batch(SyncConfig::Type::AwayAssignments);
     AddAwayAssignment(batch, *instance);
@@ -270,14 +286,15 @@ namespace
       present.insert(buff.buffid());
       const bool    expires = buff.has_activebuff() && buff.activebuff().has_expirytime();
       const int64_t expiry  = expires ? buff.activebuff().expirytime().seconds() : -1;
-      if (buffs.Changed(buff.buffid(), {buff.level(), expiry}))
+      if (sent.buffs.Changed(buff.buffid(), {buff.level(), expiry}))
         batch.Add({{"type", SyncConfig::Type::Buffs},
                    {"bid", buff.buffid()},
                    {"level", buff.level()},
                    {"expiry_time", expires ? json(expiry) : json(nullptr)}});
     }
-    buffs.Prune(present, [&](int64_t id) { batch.Add({{"type", "expired_" + SyncConfig::Type::Buffs}, {"bid", id}}); });
-    batch.Send(&first_buffs);
+    sent.buffs.Prune(present,
+                     [&](int64_t id) { batch.Add({{"type", "expired_" + SyncConfig::Type::Buffs}, {"bid", id}}); });
+    batch.Send(&sent.first_buffs);
   }
 
   // The emerald chain level is the highest tier the alliance has claimed.
@@ -296,7 +313,7 @@ namespace
         std::from_chars(tier.data(), tier.data() + tier.size(), value);
         level = std::max(level, value);
       }
-      if (level != std::exchange(emerald_chain_level, level)) {
+      if (level != std::exchange(sent.emerald_chain_level, level)) {
         Batch batch(SyncConfig::Type::EmeraldChain);
         batch.Add({{"type", SyncConfig::Type::EmeraldChain}, {"level", level}});
         batch.Send();
@@ -314,22 +331,23 @@ namespace
 
     Batch batch(SyncConfig::Type::Buildings);
     for (const auto& module : response->modulestates())
-      if (modules.Changed(module.id(), module.level()))
+      if (sent.modules.Changed(module.id(), module.level()))
         batch.Add({{"type", SyncConfig::Type::Buildings}, {"bid", module.id()}, {"level", module.level()}});
     batch.Send();
   }
 
   void ProcessHavenBase(const std::string& bytes)
   {
-    haven_base_synced = true;
-    auto response     = Parse<pb::PlanetaryBase>(bytes, "planetary base");
+    if (std::exchange(sent.haven_base, true))
+      return;
+    auto response = Parse<pb::PlanetaryBase>(bytes, "planetary base");
     if (!response)
       return;
     Trace("planetary base data", response->pieces_size());
 
     Batch batch(SyncConfig::Type::Haven);
     for (const auto& [piece, count] : response->pieces())
-      if (haven_pieces.Changed(piece, count))
+      if (sent.haven_pieces.Changed(piece, count))
         batch.Add({{"type", SyncConfig::Type::Haven + "_pieces"}, {"sid", piece}, {"count", count}});
     batch.Send();
   }
@@ -337,15 +355,16 @@ namespace
   // TODO: PlanetaryMapBuildingDiff would let later changes in a session through; today only the first map is sent.
   void ProcessHavenMap(const std::string& bytes)
   {
-    haven_map_synced = true;
-    auto response    = Parse<pb::PlanetaryMapData>(bytes, "planetary map");
+    if (std::exchange(sent.haven_map, true))
+      return;
+    auto response = Parse<pb::PlanetaryMapData>(bytes, "planetary map");
     if (!response)
       return;
     Trace("planetary map data", response->buildings_size());
 
     Batch batch(SyncConfig::Type::Haven);
     for (const auto& [id, building] : response->buildings())
-      if (haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
+      if (sent.haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
         batch.Add({{"type", SyncConfig::Type::Haven}, {"sid", building.specid()}, {"id", id},
                    {"level", building.level()}, {"status", building.status()}, {"position", building.position()}});
     FirstSync first;
@@ -367,7 +386,7 @@ namespace
     }
     Batch batch(SyncConfig::Type::Haven);
     for (const auto& [id, building] : response->mapdata().buildings())
-      if (haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
+      if (sent.haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
         batch.Add({{"type", SyncConfig::Type::Haven}, {"sid", building.specid()}, {"id", id},
                    {"level", building.level()}, {"status", building.status()}, {"position", building.position()}});
     FirstSync first;
@@ -376,8 +395,9 @@ namespace
 
   void ProcessHavenProsperity(const std::string& bytes)
   {
-    haven_prosperity_synced = true;
-    auto response           = Parse<pb::PlanetaryMapProsperityResponse>(bytes, "planetary map prosperity");
+    if (std::exchange(sent.haven_prosperity, true))
+      return;
+    auto response = Parse<pb::PlanetaryMapProsperityResponse>(bytes, "planetary map prosperity");
     if (!response)
       return;
 
@@ -400,14 +420,14 @@ namespace
         if (!item.has_commonparams())
           continue;
         const auto id = item.commonparams().refid();
-        if (inventory.Changed({item.type(), id}, item.count()))
+        if (sent.inventory.Changed({item.type(), id}, item.count()))
           batch.Add({{"type", SyncConfig::Type::Inventory},
                      {"item_type", item.type()},
                      {"refid", id},
                      {"count", item.count()}});
       }
     }
-    batch.Send(&first_inventory);
+    batch.Send(&sent.first_inventory);
   }
 
   // The fields that identify what a job is working on, or nothing for job types that are not synced.
@@ -444,7 +464,7 @@ namespace
     std::unordered_set<std::string> present;
     for (const auto& job : response->jobs()) {
       present.insert(job.uuid());
-      if (!active_jobs.Changed(job.uuid(), true))
+      if (!sent.active_jobs.Changed(job.uuid(), true))
         continue;
       auto details = JobDetails(job);
       if (!details)
@@ -458,13 +478,13 @@ namespace
       record.update(*details);
       batch.Add(std::move(record));
     }
-    active_jobs.Prune(present, [&](const std::string& uuid) {
+    sent.active_jobs.Prune(present, [&](const std::string& uuid) {
       batch.Add({{"type", "completed_" + SyncConfig::Type::Jobs}, {"uuid", uuid}});
     });
-    batch.Send(&first_jobs);
+    batch.Send(&sent.first_jobs);
   }
 
-  // The whole set of active missions is sent whenever it changes.
+  // The whole set of active missions is sent whenever it changes; an empty set as one record with a null "mid".
   void ProcessActiveMissions(const std::string& bytes)
   {
     auto response = Parse<pb::ActiveMissionsResponse>(bytes, "active missions");
@@ -475,13 +495,18 @@ namespace
     std::unordered_set<int64_t> current;
     for (const auto& mission : response->activemissions())
       current.insert(mission.id());
-    if (current == active_missions)
+    if (sent.active_missions_sent && current == sent.active_missions)
       return;
-    active_missions = std::move(current);
+    sent.active_missions_sent = true;
+    sent.active_missions      = std::move(current);
 
     Batch batch(SyncConfig::Type::Missions);
-    for (const auto mission : active_missions)
+    for (const auto mission : sent.active_missions)
       batch.Add({{"type", "active_" + SyncConfig::Type::Missions}, {"mid", mission}});
+    // An empty set has no records to send, so targets would keep showing the last mission active. One record with
+    // a null mission id stands for "no active missions".
+    if (sent.active_missions.empty())
+      batch.Add({{"type", "active_" + SyncConfig::Type::Missions}, {"mid", nullptr}});
     batch.Send();
   }
 
@@ -495,7 +520,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Missions);
     for (const auto mission : response->completedmissions())
-      if (completed_missions.insert(mission).second)
+      if (sent.completed_missions.insert(mission).second)
         batch.Add({{"type", SyncConfig::Type::Missions}, {"mid", mission}});
     batch.Send();
   }
@@ -509,7 +534,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Officer);
     for (const auto& officer : response->officers())
-      if (officers.Changed(officer.id(), {officer.rankindex(), officer.level(), officer.shardcount()}))
+      if (sent.officers.Changed(officer.id(), {officer.rankindex(), officer.level(), officer.shardcount()}))
         batch.Add({{"type", SyncConfig::Type::Officer},
                    {"oid", officer.id()},
                    {"rank", officer.rankindex()},
@@ -527,7 +552,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Research);
     for (const auto& [id, level] : response->researchprojectlevels())
-      if (research.Changed(id, level))
+      if (sent.research.Changed(id, level))
         batch.Add({{"type", SyncConfig::Type::Research}, {"rid", id}, {"level", level}});
     batch.Send();
   }
@@ -551,8 +576,8 @@ namespace
 
     Batch batch(SyncConfig::Type::Resources);
     for (const auto& resource : response->resources())
-      AddResource(batch, resources, "", resource.id(), resource.currentamount());
-    batch.Send(&first_resources);
+      AddResource(batch, sent.resources, "", resource.id(), resource.currentamount());
+    batch.Send(&sent.first_resources);
   }
 
   void ProcessResourcesDelta(const std::string& bytes)
@@ -564,7 +589,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Resources);
     for (const auto& resource : response->resources())
-      AddResource(batch, resources, "", resource.id(), resource.amount());
+      AddResource(batch, sent.resources, "", resource.id(), resource.amount());
     batch.Send();
   }
 
@@ -578,8 +603,8 @@ namespace
     Batch batch(SyncConfig::Type::Resources);
     for (const auto& item : response->items())
       if (item.has_commonparams())
-        AddResource(batch, alliance_resources, "alliance_", item.commonparams().refid(), item.count());
-    batch.Send(&first_alliance_resources);
+        AddResource(batch, sent.alliance_resources, "alliance_", item.commonparams().refid(), item.count());
+    batch.Send(&sent.first_alliance_resources);
   }
 
   void ProcessAllianceResourcesDelta(const std::string& bytes)
@@ -591,7 +616,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Resources);
     for (const auto& resource : response->resources())
-      AddResource(batch, alliance_resources, "alliance_", resource.id(), resource.amount());
+      AddResource(batch, sent.alliance_resources, "alliance_", resource.id(), resource.amount());
     batch.Send();
   }
 
@@ -601,7 +626,7 @@ namespace
   void AddSlot(Batch& batch, int64_t id, int32_t slot_type, const json& spec_id, const json& item_id,
                const json& params, int64_t state)
   {
-    if (slots.Changed(id, state))
+    if (sent.slots.Changed(id, state))
       batch.Add({{"type", SyncConfig::Type::Slots},
                  {"sid", id},
                  {"slot_type", slot_type},
@@ -657,7 +682,7 @@ namespace
           auto        setups = json::array();
           for (const auto& setup : preset.setups())
             setups.push_back({{"drydock_id", setup.drydockid()},
-                              {"ship_id", setup.shipids()[0]},
+                              {"ship_id", setup.shipids_size() > 0 ? json(setup.shipids(0)) : json(nullptr)},
                               {"officer_ids", setup.officerids()}});
           params = {{"name", preset.name()}, {"order", preset.order()}, {"setup", setups}};
           state  = Hash(params);
@@ -727,11 +752,11 @@ namespace
           break;
         case pb::SLOTTYPE_FLEETCOMMANDER:
           if (const auto& commander = data["fleet_commander_slot_params"]; !commander.is_null())
-            params["order"] = commander["order"];
+            params["order"] = commander.at("order");
           break;
         case pb::SLOTTYPE_SELECTABLESKILL:
           if (const auto& skill = data["selectable_skill_slot_params"]; !skill.is_null())
-            params["cooldown_expiration"] = timestamp(skill["cooldown_expiration"]);
+            params["cooldown_expiration"] = timestamp(skill.value("cooldown_expiration", json()));
           break;
         case pb::SLOTTYPE_FORBIDDENTECH:
           if (const auto& tech = data["forbidden_tech_slot_params"]; !tech.is_null()) {
@@ -742,9 +767,13 @@ namespace
         case pb::SLOTTYPE_FLEETPRESET:
           if (const auto& preset = data["fleet_preset_slot_params"]; !preset.is_null()) {
             auto setups = json::array();
-            for (const auto& setup : preset["setups"])
-              setups.push_back({{"drydock_id", setup["d"]}, {"ship_id", setup["s"][0]}, {"officer_ids", setup["o"]}});
-            params = {{"name", preset["name"]}, {"order", preset["order"]}, {"setup", setups}};
+            for (const auto& setup : preset.at("setups")) {
+              const auto& ship_ids = setup.at("s");
+              setups.push_back({{"drydock_id", setup.at("d")},
+                                {"ship_id", ship_ids.empty() ? json(nullptr) : ship_ids.at(0)},
+                                {"officer_ids", setup.at("o")}});
+            }
+            params = {{"name", preset.at("name")}, {"order", preset.at("order")}, {"setup", setups}};
             state  = Hash(params);
           }
           break;
@@ -769,7 +798,7 @@ namespace
 
     Batch batch(SyncConfig::Type::Tech);
     for (const auto& tech : response->forbiddentechs())
-      if (techs.Changed(tech.id(), {tech.tier(), tech.level(), tech.shardcount()}))
+      if (sent.techs.Changed(tech.id(), {tech.tier(), tech.level(), tech.shardcount()}))
         batch.Add({{"type", SyncConfig::Type::Tech},
                    {"fid", tech.id()},
                    {"tier", tech.tier()},
@@ -788,7 +817,7 @@ namespace
     Batch batch(SyncConfig::Type::Traits);
     for (const auto& [officer, officer_traits] : response->activeofficertraits())
       for (const auto& trait : officer_traits.activetraits() | std::views::values)
-        if (traits.Changed({officer, trait.traitid()}, trait.level()))
+        if (sent.traits.Changed({officer, trait.traitid()}, trait.level()))
           batch.Add({{"type", SyncConfig::Type::Traits},
                      {"oid", officer},
                      {"tid", trait.traitid()},
@@ -798,7 +827,7 @@ namespace
 
   void AddShip(Batch& batch, int64_t id, int64_t hull_id, const ShipState& state)
   {
-    if (ships.Changed(id, state))
+    if (sent.ships.Changed(id, state))
       batch.Add({{"type", SyncConfig::Type::Ships},
                  {"psid", id},
                  {"level", state.level},
@@ -819,46 +848,68 @@ namespace
     for (const auto& ship : response->ships() | std::views::values)
       AddShip(batch, ship.id(), ship.hullid(),
               {ship.tier(), ship.level(), ship.levelpercentage(), {ship.components().begin(), ship.components().end()}});
-    batch.Send(&first_ships);
+    batch.Send(&sent.first_ships);
   }
 
   // Early in a session resources and starbase modules come in the game's JSON responses rather than as protobuf
-  // entity groups. Before client build 267, so did ships and battle headers.
+  // entity groups; before client build 267, so did ships and battle headers. Server data can lack any field, so
+  // every read goes through at(), which throws, and a record is read in full before anything is recorded as sent.
+  // A malformed record is skipped, not its section.
+  template <typename Read> void ForEachRecord(const json& section, std::string_view what, Read&& read)
+  {
+    for (const auto& [key, record] : section.items()) {
+      try {
+        read(key, record);
+      } catch (const std::exception& e) {
+        spdlog::error("Skipping malformed {} record {}: {}", what, key, e.what());
+      }
+    }
+  }
+
   void ProcessJsonResources(const json& section)
   {
     Batch batch(SyncConfig::Type::Resources);
-    for (const auto& [id, resource] : section.get<json::object_t>())
-      AddResource(batch, resources, "", std::stoll(id), resource["current_amount"].get<int64_t>());
-    batch.Send(&first_json_resources);
+    ForEachRecord(section, "resource", [&](const std::string& id, const json& resource) {
+      const auto amount = resource.at("current_amount").get<int64_t>();
+      AddResource(batch, sent.resources, "", std::stoll(id), amount);
+    });
+    batch.Send(&sent.first_json_resources);
   }
 
   void ProcessJsonModules(const json& section)
   {
     Batch batch(SyncConfig::Type::Buildings);
-    for (const auto& module : section.get<json::object_t>() | std::views::values) {
-      const auto id    = module["id"].get<int64_t>();
-      const auto level = module["level"].get<int32_t>();
-      if (modules.Changed(id, level))
+    ForEachRecord(section, "starbase module", [&](const std::string&, const json& module) {
+      const auto id    = module.at("id").get<int64_t>();
+      const auto level = module.at("level").get<int32_t>();
+      if (sent.modules.Changed(id, level))
         batch.Add({{"type", SyncConfig::Type::Buildings}, {"bid", id}, {"level", level}});
-    }
+    });
     batch.Send();
   }
 
   void ProcessJsonShips(const json& section)
   {
     Batch batch(SyncConfig::Type::Ships);
-    for (const auto& ship : section.get<json::object_t>() | std::views::values)
-      AddShip(batch, ship["id"].get<int64_t>(), ship["hull_id"].get<int64_t>(),
-              {ship["tier"].get<int32_t>(), ship["level"].get<int32_t>(), ship["level_percentage"].get<double>(),
-               ship["components"].get<std::vector<int64_t>>()});
-    batch.Send(&first_ships);
+    ForEachRecord(section, "ship", [&](const std::string&, const json& ship) {
+      AddShip(batch, ship.at("id").get<int64_t>(), ship.at("hull_id").get<int64_t>(),
+              {ship.at("tier").get<int32_t>(), ship.at("level").get<int32_t>(),
+               ship.at("level_percentage").get<double>(), ship.at("components").get<std::vector<int64_t>>()});
+    });
+    batch.Send(&sent.first_ships);
   }
 
   void ProcessJsonBattles(const json& section)
   {
     std::vector<uint64_t> battle_ids;
-    for (const auto& battle : section)
-      battle_ids.push_back(battle["id"].get<uint64_t>());
+    for (const auto& header : section) {
+      const auto id = header.is_object() ? header.find("id") : header.end();
+      if (id == header.end() || !id->is_number_unsigned()) {
+        spdlog::error("Skipping a battle header without a numeric id");
+        continue;
+      }
+      battle_ids.push_back(id->get<uint64_t>());
+    }
     QueueNewBattles(battle_ids);
   }
 
@@ -868,7 +919,7 @@ namespace
     try {
       const auto result = json::parse(bytes);
       for (const auto& [key, section] : result.items()) {
-        logging::trace("PROCESS", key, fmt::format("Processing {} entries (JSON)", section.size()));
+        logging::trace("PROCESS", key, "Processing {} entries (JSON)", section.size());
         if (key == "battle_result_headers" && options.battlelogs)
           ProcessJsonBattles(section);
         else if (key == "resources" && options.resources)
@@ -902,10 +953,8 @@ namespace
   struct Route {
     EntityGroup::Type type;
     void (*process)(const std::string& bytes);
-    // The category that must be enabled; null for responses that check their own sections.
+    // The category that must be enabled; null for the JSON responses, which check their own sections.
     bool SyncConfig::* option;
-    // Set once a once-per-session response was processed.
-    const std::atomic_bool* done = nullptr;
   };
 
   const Route kRoutes[] = {
@@ -917,10 +966,10 @@ namespace
       {EntityGroup::Type::GlobalActiveBuffs, ProcessBuffs, &SyncConfig::buffs},
       {EntityGroup::Type::AllianceGetGameProperties, ProcessAllianceGameProperties, &SyncConfig::buffs},
       {EntityGroup::Type::StarbaseModules, ProcessStarbaseModules, &SyncConfig::buildings},
-      {EntityGroup::Type::PlanetaryBaseData, ProcessHavenBase, &SyncConfig::haven, &haven_base_synced},
+      {EntityGroup::Type::PlanetaryBaseData, ProcessHavenBase, &SyncConfig::haven},
       {EntityGroup::Type::PlanetaryMapResponse, ProcessHavenMapResponse, &SyncConfig::haven},
-      {EntityGroup::Type::PlanetaryMapData, ProcessHavenMap, &SyncConfig::haven, &haven_map_synced},
-      {EntityGroup::Type::PlanetaryMapProsperity, ProcessHavenProsperity, &SyncConfig::haven, &haven_prosperity_synced},
+      {EntityGroup::Type::PlanetaryMapData, ProcessHavenMap, &SyncConfig::haven},
+      {EntityGroup::Type::PlanetaryMapProsperity, ProcessHavenProsperity, &SyncConfig::haven},
       {EntityGroup::Type::PlayerInventories, ProcessInventory, &SyncConfig::inventory},
       {EntityGroup::Type::Jobs, ProcessJobs, &SyncConfig::jobs},
       {EntityGroup::Type::ActiveMissions, ProcessActiveMissions, &SyncConfig::missions},
@@ -946,10 +995,13 @@ namespace
     if (!group || !group->bytes() || group->Length() <= 0)
       return;
 
-    const auto type  = entity_group->Type_();
-    const auto route = std::ranges::find(kRoutes, type, &Route::type);
-    if (route == std::end(kRoutes) || (route->option && !(Config::Get().sync.options.*route->option))
-        || (route->done && *route->done))
+    // Checked per response rather than at install, so targets and categories can change at runtime. Without a
+    // wanted category nothing is copied or parsed.
+    const auto  route   = std::ranges::find(kRoutes, entity_group->Type_(), &Route::type);
+    const auto& options = Config::Get().sync.options;
+    if (route == std::end(kRoutes)
+        || !(route->option ? options.*route->option
+                           : options.battlelogs || options.resources || options.buildings || options.ships))
       return;
     pending.Push({route->process, std::string(reinterpret_cast<const char*>(group->bytes()->data()),
                                               static_cast<size_t>(group->Length()))});
@@ -975,11 +1027,11 @@ namespace
   {
     if (Config::Get().sync.options.slots && realtimeDataPayload && realtimeDataPayload->Target()
         && realtimeDataPayload->DataType() && realtimeDataPayload->Data()) {
-      // DataType arrives as a number in a string. This runs inside the game's parser, so nothing here may throw.
-      const auto type_string = to_string(realtimeDataPayload->DataType());
-      int        type        = -1;
-      std::from_chars(type_string.data(), type_string.data() + type_string.size(), type);
-      if (type == DataType::JSON)
+      // DataType arrives as a number in a string; JSON is "0". This runs inside the game's parser, so nothing here
+      // may throw.
+      static_assert(DataType::JSON == 0);
+      const auto* type = realtimeDataPayload->DataType();
+      if (type->length == 1 && type->chars[0] == u'0')
         pending.Push({ProcessRealtimeSlot, to_string(realtimeDataPayload->Data())});
     }
     return original(_this, centrifugoInfo, realtimeDataPayload, finalPayload);
@@ -1001,6 +1053,9 @@ namespace
   {
     original(_this, gameServerUrl, gatewayServerUrl, sessionId, serverRegion);
     SetGameServer(to_string(gameServerUrl), to_string(sessionId));
+    // A new login (or a switch of account or server) must not be diffed against the last one's data: the new
+    // account gets its first full upload and haven data again, and nothing of the old one is reported gone.
+    pending.Push({StartNewSession, {}});
   }
 
   void GameServer_Initialise(auto original, void* _this, Il2CppString* sessionId, Il2CppString* gameVersion,
@@ -1044,7 +1099,6 @@ void InstallSyncPatches()
   if (auto m = SlotClearRtcParser::Method("ParseFinalPayload"))
     SPUD_STATIC_DETOUR(m.Pointer(), RtcParser_ParseFinalPayload);
 
-  StartUploads();
   StartBattleLogs();
   std::thread(RunJobs).detach();
 }
