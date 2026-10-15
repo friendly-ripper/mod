@@ -1,10 +1,11 @@
-//! Build graph for the mod and its native test fixtures.
+//! Build graph for the mod, its native test fixtures, and the macOS launcher.
 //!
 //!   zig/ctx.zig         per-target compile rules (Ctx), library handles (Lib), shared options
 //!   zig/toolchains.zig  pinned SDKs: fetch-toolchains and sysroot lookup
 //!   zig/deps.zig        third-party C and C++ libraries
 //!   zig/protobuf.zig    protobuf-lite, Abseil, and generated game messages
 //!   zig/mod.zig         IL2CPP and Unity libraries, the mod, and platform entry points
+//!   zig/launcher.zig    the Swift launcher app
 //!   zig/tests.zig       native fixtures and the dependency smoke test
 //!   zig/tools/          host programs the build runs
 const std = @import("std");
@@ -13,6 +14,7 @@ const Ctx = @import("zig/ctx.zig").Ctx;
 const Options = @import("zig/ctx.zig").Options;
 const globFiles = @import("zig/ctx.zig").globFiles;
 const deps = @import("zig/deps.zig");
+const launcher = @import("zig/launcher.zig");
 const mod = @import("zig/mod.zig");
 const protobuf = @import("zig/protobuf.zig");
 const tests = @import("zig/tests.zig");
@@ -60,6 +62,7 @@ pub fn build(b: *std.Build) void {
     const cpr = deps.cpr(ctx, curl);
     const unity = mod.unity(ctx, il2cpp, spud);
     mod.add(ctx, &.{ il2cpp, unity, spdlog, spud, proto, proto_runtime, cpr, curl, toml, deps.nlohmannJson(ctx) });
+    launcher.add(ctx);
     tests.addDependencySmoke(ctx, &.{ proto, proto_runtime, cpr, curl, zlib });
 
     // Build one dependency in isolation, to check a pin bump or a cross-compile without the mod.
