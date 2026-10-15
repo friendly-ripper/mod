@@ -665,7 +665,7 @@ void Config::Load(const SettingsFile& file, bool first)
   r.Read("ui", "cargo_significant_decimals", u.cargo_significant_decimals);
   r.Read("ui", "always_skip_reveal_sequence", u.always_skip_reveal_sequence);
   r.ReadRenamed("ui", "disable_exchange_all", "hide_artifact_exchange_all", u.disable_exchange_all);
-  for (const char* button : {"q_trials", "field_training", "outposts", "daily_goals", "missions"})
+  for (const char* button : {"q_trials", "field_training", "outposts", "missions"})
     r.Choose("ui", std::string("hud_") + button, u.mission_hud_buttons[button], kHudVisibility);
   u.disabled_banner_types = ReadBannerTypes(r, "disabled_banner_types");
   u.notify_banner_types   = ReadBannerTypes(r, "notify_banner_types");

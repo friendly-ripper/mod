@@ -314,7 +314,7 @@ public:
     bool always_skip_reveal_sequence = true;
     // Hides the artifact shards popup's Exchange All button; single exchanges stay. Takes effect on the next popup.
     bool disable_exchange_all = false;
-    // Mission HUD buttons by name (q_trials, field_training, outposts, daily_goals, missions).
+    // Mission HUD buttons by name (q_trials, field_training, outposts, missions).
     std::map<std::string, MissionHudVisibility, std::less<>> mission_hud_buttons;
 
     // ToastState values.
