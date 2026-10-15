@@ -24,8 +24,8 @@ namespace
   constexpr size_t kJobQueueCapacity = 256;
 
   struct Job {
-    Processor   process;
-    std::string bytes;
+    Processor process;
+    Input     input;
   };
 
   auto& pending = *new BoundedQueue<Job>{"processing", kJobQueueCapacity};
@@ -37,7 +37,8 @@ namespace
     for (;;) {
       auto job = pending.Pop();
       try {
-        job.process(job.bytes);
+        if (job.input.generation == Session().generation)
+          job.process(job.input);
       } catch (const std::exception& e) {
         spdlog::error("Exception while processing sync data: {}", e.what());
       } catch (...) {
@@ -49,23 +50,37 @@ namespace
   // Runs on the game thread: copies the bytes out and leaves the work to the processing thread.
   void HandleEntityGroup(EntityGroup* entity_group)
   {
-    auto* group   = entity_group ? entity_group->Group() : nullptr;
-    auto  process = group && group->bytes() && group->Length() > 0 ? ProcessorFor(entity_group->Type()) : nullptr;
-    if (process)
-      pending.Push({process, std::string(reinterpret_cast<const char*>(group->bytes()->data()),
-                                         static_cast<size_t>(group->Length()))});
+    auto* group = entity_group ? entity_group->Group() : nullptr;
+    if (!group)
+      return;
+    const auto length = group->Length();
+    auto*      bytes  = group->bytes();
+    if (length < 0 || (length > 0 && (!bytes || static_cast<size_t>(length) > bytes->size())))
+      return;
+    if (auto process = ProcessorFor(entity_group->Type())) {
+      Input input{Session().generation,
+                  length ? std::string(reinterpret_cast<const char*>(bytes->data()), static_cast<size_t>(length))
+                         : std::string{}};
+      if (entity_group->Type() == EntityGroup::Kind::PlanetaryMapResponse) {
+        auto* manager = UserProfileManager::Instance();
+        auto* profile = manager ? manager->GetLocalUserProfile() : nullptr;
+        if (profile)
+          input.user_id = il2cpp::ToUtf8(profile->UserId());
+      }
+      pending.Push({process, std::move(input)});
+    }
   }
 
   void* RtcParser_ParseFinalPayload_Hook(auto original, void* _this, CentrifugoInfo centrifugoInfo,
                                          RealtimeDataPayload* realtimeDataPayload, void* finalPayload)
   {
-    if (Config::Get().sync.options.slots && realtimeDataPayload && realtimeDataPayload->Target()
-        && realtimeDataPayload->DataType() && realtimeDataPayload->Data()) {
+    if (realtimeDataPayload && realtimeDataPayload->Target() && realtimeDataPayload->DataType()
+        && realtimeDataPayload->Data()) {
       // DataType arrives as a number in a string; JSON is "0". This runs inside the game's parser, so nothing here
       // may throw.
       const auto* type = realtimeDataPayload->DataType();
       if (type->length == 1 && type->chars[0] == u'0')
-        pending.Push({ProcessRealtimeSlot, il2cpp::ToUtf8(realtimeDataPayload->Data())});
+        pending.Push({ProcessRealtimeSlot, {Session().generation, il2cpp::ToUtf8(realtimeDataPayload->Data())}});
     }
     return original(_this, centrifugoInfo, realtimeDataPayload, finalPayload);
   }
@@ -85,11 +100,9 @@ namespace
                                      Il2CppString* gatewayServerUrl, Il2CppString* sessionId,
                                      Il2CppString* serverRegion)
   {
-    original(_this, gameServerUrl, gatewayServerUrl, sessionId, serverRegion);
+    // Establish the generation before original can deliver responses from the new session.
     SetGameServer(il2cpp::ToUtf8(gameServerUrl), il2cpp::ToUtf8(sessionId));
-    // A new login (or a switch of account or server) must not be diffed against the last one's data: the new
-    // account gets its first full upload and haven data again, and nothing of the old one is reported gone.
-    pending.Push({StartNewSession, {}});
+    original(_this, gameServerUrl, gatewayServerUrl, sessionId, serverRegion);
   }
 
   void GameServer_Initialise_Hook(auto original, void* _this, Il2CppString* sessionId, Il2CppString* gameVersion,
@@ -125,10 +138,11 @@ namespace
     IL2CPP_HOOK(SlotAssignRtcParser::Method("ParseFinalPayload"), RtcParser_ParseFinalPayload_Hook);
     IL2CPP_HOOK(SlotClearRtcParser::Method("ParseFinalPayload"), RtcParser_ParseFinalPayload_Hook);
 
+    FollowSettings();
     StartBattleLogs();
     std::thread(RunJobs).detach();
   }
 } // namespace
 } // namespace data_sync
 
-const Feature kSync{"Sync", &Config::Patches::syncpatches, data_sync::Install};
+const Feature kSync{"Sync", &Config::Patches::syncpatches, data_sync::Install, data_sync::FollowSettings};
