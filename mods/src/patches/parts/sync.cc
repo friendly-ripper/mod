@@ -942,8 +942,6 @@ static void ship_sync_data()
         ErrorMsg::SyncRuntime("ship", e);
       } catch (const std::exception& e) {
         ErrorMsg::SyncMsg("ship", e.what());
-      } catch (const std::wstring& sz) {
-        ErrorMsg::SyncMsg("ship", sz);
 #if _WIN32
       } catch (winrt::hresult_error const& ex) {
         ErrorMsg::SyncWinRT("ship", ex);
@@ -1094,8 +1092,6 @@ static void ship_combat_log_data()
         ErrorMsg::SyncRuntime("combat", e);
       } catch (const std::exception& e) {
         ErrorMsg::SyncException("combat", e);
-      } catch (const std::wstring& sz) {
-        ErrorMsg::SyncMsg("combat", sz);
 #if _WIN32
       } catch (winrt::hresult_error const& ex) {
         ErrorMsg::SyncWinRT("combat", ex);
@@ -2377,13 +2373,8 @@ namespace rtc
           if (const auto& expiry_time = data["consumable_slot_params"]["expiry_time"]; expiry_time.is_null()) {
             slot_params["expiry_time"] = nullptr;
           } else {
-            const auto timestamp =
-                parse_timestamp(data["consumable_slot_params"]["expiry_time"].get_ref<const std::string&>());
-            if (timestamp.has_value()) {
-              slot_params["expiry_time"] = timestamp.value().time_since_epoch().count();
-            } else {
-              slot_params["expiry_time"] = nullptr;
-            }
+            const auto timestamp = parse_timestamp(expiry_time.get_ref<const std::string&>());
+            slot_params["expiry_time"] = timestamp ? json(timestamp->time_since_epoch().count()) : json(nullptr);
           }
           break;
         case Digit::PrimeServer::Models::SLOTTYPE_OFFICERPRESET:
@@ -2402,12 +2393,8 @@ namespace rtc
             if (const auto& expiry_time = params["cooldown_expiration"]; expiry_time.is_null()) {
               slot_params["cooldown_expiration"] = nullptr;
             } else {
-              const auto timestamp = parse_timestamp(params["cooldown_expiration"].get_ref<const std::string&>());
-              if (timestamp.has_value()) {
-                slot_params["cooldown_expiration"] = timestamp.value().time_since_epoch().count();
-              } else {
-                slot_params["cooldown_expiration"] = nullptr;
-              }
+              const auto timestamp = parse_timestamp(expiry_time.get_ref<const std::string&>());
+              slot_params["cooldown_expiration"] = timestamp ? json(timestamp->time_since_epoch().count()) : json(nullptr);
             }
           }
           break;
