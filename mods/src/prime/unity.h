@@ -38,6 +38,23 @@ struct color {
 };
 #pragma pack(pop)
 
+// UnityEngine.Object's statics. Alive is Unity's bool(Object): false for null, and for objects whose native side was
+// destroyed even while a GC handle still holds the managed wrapper.
+struct UnityObject {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Object">;
+
+  static bool Alive(Il2CppObject* object)
+  { return object && Class::Call<"op_Implicit", bool>(object); }
+  static void Destroy(Il2CppObject* object)
+  { Class::Call<"Destroy">(object); }
+  // Scans every loaded object; keep it off per-frame paths.
+  template <typename T> static T* Find()
+  {
+    auto* type = T::Class::TypeObject();
+    return type ? static_cast<T*>(Class::Call<"FindObjectOfType", Il2CppObject*>(type)) : nullptr;
+  }
+};
+
 struct GameObject : il2cpp::Object {
   using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "GameObject">;
 
@@ -104,6 +121,15 @@ struct RectTransform : Transform {
   { Set<"sizeDelta">(value); }
   void SetAnchoredPosition(Vector2 value)
   { Set<"anchoredPosition">(value); }
+
+  void Place(Vector2 anchor_min, Vector2 anchor_max, Vector2 pivot, Vector2 size, Vector2 position)
+  {
+    SetAnchorMin(anchor_min);
+    SetAnchorMax(anchor_max);
+    SetPivot(pivot);
+    SetSizeDelta(size);
+    SetAnchoredPosition(position);
+  }
 };
 
 // UnityEngine.Component, the base of every MonoBehaviour. Use As<Component>() on other bindings.
@@ -114,6 +140,40 @@ struct Component : il2cpp::Object {
   { return Get<"transform", Transform*>(); }
   GameObject* gameObject()
   { return Get<"gameObject", GameObject*>(); }
+};
+
+struct Behaviour : Component {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Behaviour">;
+
+  void SetEnabled(bool value)
+  { Set<"enabled">(value); }
+};
+
+struct TMP_Text : Component {
+  using Class = il2cpp::Class<"Unity.TextMeshPro", "TMPro", "TMP_Text">;
+
+  // TMP_FontAsset
+  il2cpp::Object* font()
+  { return Get<"font", il2cpp::Object*>(); }
+  void SetFont(il2cpp::Object* value)
+  { Set<"font">(value); }
+  void SetFontSize(float value)
+  { Set<"fontSize">(value); }
+  // TextAlignmentOptions
+  void SetAlignment(int32_t value)
+  { Set<"alignment">(value); }
+  void SetColor(color value)
+  { Set<"color">(value); }
+  void SetRaycastTarget(bool value)
+  { Set<"raycastTarget">(value); }
+  void SetEnableWordWrapping(bool value)
+  { Set<"enableWordWrapping">(value); }
+  void SetText(Il2CppString* value)
+  { Set<"text">(value); }
+};
+
+struct TextMeshProUGUI : TMP_Text {
+  using Class = il2cpp::Class<"Unity.TextMeshPro", "TMPro", "TextMeshProUGUI">;
 };
 
 struct Camera : il2cpp::Object {
