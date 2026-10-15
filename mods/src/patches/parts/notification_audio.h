@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 enum class NotificationSound : uint8_t {
@@ -20,4 +21,6 @@ enum class NotificationSound : uint8_t {
 
 [[nodiscard]] std::string_view                 NotificationSoundName(NotificationSound sound);
 [[nodiscard]] std::optional<NotificationSound> ParseNotificationSound(std::string_view name);
-void                                           PlayNotificationSound(NotificationSound sound);
+// Generated mono PCM WAV bytes, cached for the process lifetime. None and invalid sounds have no data.
+std::span<const uint8_t> NotificationSoundBytes(NotificationSound sound);
+void                     PlayNotificationSound(NotificationSound sound);
