@@ -37,7 +37,7 @@ namespace
     for (;;) {
       auto job = pending.Pop();
       try {
-        if (job.input.generation == Session().generation)
+        if (job.input.generation == SessionGeneration())
           job.process(job.input);
       } catch (const std::exception& e) {
         spdlog::error("Exception while processing sync data: {}", e.what());
@@ -58,7 +58,7 @@ namespace
     if (length < 0 || (length > 0 && (!bytes || static_cast<size_t>(length) > bytes->size())))
       return;
     if (auto process = ProcessorFor(entity_group->Type())) {
-      Input input{Session().generation,
+      Input input{SessionGeneration(),
                   length ? std::string(reinterpret_cast<const char*>(bytes->data()), static_cast<size_t>(length))
                          : std::string{}};
       if (entity_group->Type() == EntityGroup::Kind::PlanetaryMapResponse) {
@@ -80,7 +80,7 @@ namespace
       // may throw.
       const auto* type = realtimeDataPayload->DataType();
       if (type->length == 1 && type->chars[0] == u'0')
-        pending.Push({ProcessRealtimeSlot, {Session().generation, il2cpp::ToUtf8(realtimeDataPayload->Data())}});
+        pending.Push({ProcessRealtimeSlot, {SessionGeneration(), il2cpp::ToUtf8(realtimeDataPayload->Data())}});
     }
     return original(_this, centrifugoInfo, realtimeDataPayload, finalPayload);
   }
