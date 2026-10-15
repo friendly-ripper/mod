@@ -5,10 +5,8 @@
 
 #include <Digit.PrimeServer.Models.pb.h>
 #include <il2cpp/il2cpp.h>
-#include <prime/EntityGroup.h>
+#include <prime/server.h>
 #include <prime/Hub.h>
-#include <prime/RealtimeDataPayload.h>
-#include <prime/ServiceResponse.h>
 #include <prime/UserProfileManager.h>
 #include <spud/detour.h>
 
@@ -818,10 +816,9 @@ static std::unordered_map<int64_t, size_t> away_assignment_states;
 static std::mutex                          away_assignment_states_mtx;
 
 static std::unordered_map<int64_t, types::PlanetaryBaseState> structure_states;
-static std::mutex                                             structure_states_mtx;
-
 static std::unordered_map<int64_t, int64_t> pieces_states;
-static std::mutex                           pieces_states_mtx;
+static std::mutex pieces_states_mtx;
+static std::mutex                           structure_states_mtx;
 
 static eastl::ring_buffer<uint64_t> previously_sent_battlelogs;
 static std::mutex                   previously_sent_battlelogs_mtx;
@@ -1556,7 +1553,6 @@ static void planetary_map(std::unique_ptr<std::string>&& bytes)
 {
   if (auto response = Digit::PrimeServer::Models::PlanetaryMapResponse(); response.ParseFromString(*bytes)) {
     http::logging::trace("PROCESS", "planetary map", STR_FORMAT("Processing {} haven structures", response.mapdata().buildings_size()));
-
     const auto& owner = response.owneruserid();
     if (!owner.empty()) {
       auto profileManager = UserProfileManager::Instance();
@@ -1639,10 +1635,9 @@ static void player_inventories(std::unique_ptr<std::string>&& bytes)
 static void jobs(std::unique_ptr<std::string>&& bytes)
 {
   using json = nlohmann::json;
-  using job_state = std::tuple<int64_t, int64_t, int64_t>;
-  static std::unordered_map<std::string, job_state> jobs_active;
-  static std::mutex                                 jobs_active_mtx;
-  static std::atomic_bool                           is_first_sync{true};
+  static std::unordered_set<std::string> jobs_active;
+  static std::mutex                      jobs_active_mtx;
+  static std::atomic_bool                is_first_sync{true};
 
   if (auto response = Digit::PrimeServer::Models::JobResponse(); response.ParseFromString(*bytes)) {
 
@@ -1656,14 +1651,10 @@ static void jobs(std::unique_ptr<std::string>&& bytes)
       const std::string& uuid = job.uuid();
       uuids_in_response.insert(uuid);
 
-      const job_state state{job.starttime().seconds(), job.duration(), job.reductioninseconds()};
-
       bool emit = false;
       {
         std::scoped_lock lk(jobs_active_mtx);
-        const auto [it, inserted] = jobs_active.try_emplace(uuid, state);
-        emit                      = inserted || it->second != state;
-        it->second                = state;
+        emit = jobs_active.insert(uuid).second;
       }
 
       if (!emit) {
@@ -1712,8 +1703,8 @@ static void jobs(std::unique_ptr<std::string>&& bytes)
     {
       std::scoped_lock lk(jobs_active_mtx);
       for (auto it = jobs_active.begin(); it != jobs_active.end();) {
-        if (!uuids_in_response.contains(it->first)) {
-          job_array.push_back({{"type", "completed_" + SyncConfig::Type::Jobs}, {"uuid", it->first}});
+        if (!uuids_in_response.contains(*it)) {
+          job_array.push_back({{"type", "completed_" + SyncConfig::Type::Jobs}, {"uuid", *it}});
           it = jobs_active.erase(it);
         } else {
           ++it;

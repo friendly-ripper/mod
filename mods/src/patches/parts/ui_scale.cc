@@ -3,15 +3,13 @@
 
 #include <il2cpp/il2cpp.h>
 
-#include <prime/CanvasScaler.h>
-#include <prime/FleetMeshSelector.h>
-#include <prime/ScreenManager.h>
-#include <prime/Transform.h>
+#include <prime/unity.h>
+#include <prime/fleet.h>
+#include <prime/ui.h>
 
 #include <spdlog/spdlog.h>
 #include <spud/detour.h>
 
-#include <prime/Vector3.h>
 #include <str_utils.h>
 
 namespace
