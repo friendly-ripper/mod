@@ -208,7 +208,8 @@ public:
     bool              allow_cursor        = true;
     float             keyboard_zoom_speed = 350.0f;
     // TODO: read (with enable_experimental) but nothing applies it.
-    float system_pan_momentum         = 0.4f;
+    float system_pan_momentum = 0.4f;
+    // How much of the pan speed is kept each frame after a drag or key is released.
     float system_pan_momentum_falloff = 0.8f;
     // TODO: the F11 borderless toggle needs a SetWindowLongW detour that was never installed, so this does nothing.
     bool borderless_fullscreen = true;
