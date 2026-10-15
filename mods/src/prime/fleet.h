@@ -9,6 +9,7 @@
 #include <il2cpp/il2cpp.h>
 
 #include <cstdint>
+#include <string>
 
 struct ActionRequirement : il2cpp::Object {
   using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Models", "ActionRequirement">;
@@ -185,6 +186,18 @@ struct FleetPlayerData : il2cpp::Object {
 
   int64_t GetLocaId()
   { return Call<"GetLocaId", int64_t>(); }
+
+  // The ship's name as the game shows it, in the player's language; empty without a hull.
+  std::string DisplayName()
+  {
+    const auto loca_id = Hull() ? GetLocaId() : 0;
+    if (loca_id <= 0)
+      return {};
+    auto* context = il2cpp::New<LocaleTextContext>(il2cpp_string_new(("ship_name_" + std::to_string(loca_id)).c_str()),
+                                                   il2cpp_string_new("ships"));
+    auto* name    = context ? Localizer::Localise(context) : nullptr;
+    return name ? to_string(name) : std::string();
+  }
 };
 
 using IActionData = void*;
@@ -220,29 +233,28 @@ struct ActionType {
   static const ActionType Share;
 };
 
-inline constexpr ActionType ActionType::Invalid {-1};
-inline constexpr ActionType ActionType::Upgrade {1433481724};
+inline constexpr ActionType ActionType::Invalid{-1};
+inline constexpr ActionType ActionType::Upgrade{1433481724};
 inline constexpr ActionType ActionType::Purchase{1807968545};
-inline constexpr ActionType ActionType::Manage  {-1997567611};
-inline constexpr ActionType ActionType::Harvest {-1933286583};
-inline constexpr ActionType ActionType::Repair  {-1850668115};
-inline constexpr ActionType ActionType::View    {2666181};
-inline constexpr ActionType ActionType::Recall  {-1851055311};
-inline constexpr ActionType ActionType::Promote {1355442080};
-inline constexpr ActionType ActionType::Demote  {2043415476};
-inline constexpr ActionType ActionType::Move    {2404337};
-inline constexpr ActionType ActionType::Attack  {1971575400};
-inline constexpr ActionType ActionType::Assign  {1970629903};
-inline constexpr ActionType ActionType::Add     {65665};
-inline constexpr ActionType ActionType::Remove  {-1850743644};
-inline constexpr ActionType ActionType::Claim   {65189916};
-inline constexpr ActionType ActionType::Chat    {2099064};
-inline constexpr ActionType ActionType::Help    {2245473};
-inline constexpr ActionType ActionType::Invite  {-2099832023};
-inline constexpr ActionType ActionType::Report  {-1850654380};
-inline constexpr ActionType ActionType::Copy    {2106261};
-inline constexpr ActionType ActionType::Share   {79847359};
-
+inline constexpr ActionType ActionType::Manage{-1997567611};
+inline constexpr ActionType ActionType::Harvest{-1933286583};
+inline constexpr ActionType ActionType::Repair{-1850668115};
+inline constexpr ActionType ActionType::View{2666181};
+inline constexpr ActionType ActionType::Recall{-1851055311};
+inline constexpr ActionType ActionType::Promote{1355442080};
+inline constexpr ActionType ActionType::Demote{2043415476};
+inline constexpr ActionType ActionType::Move{2404337};
+inline constexpr ActionType ActionType::Attack{1971575400};
+inline constexpr ActionType ActionType::Assign{1970629903};
+inline constexpr ActionType ActionType::Add{65665};
+inline constexpr ActionType ActionType::Remove{-1850743644};
+inline constexpr ActionType ActionType::Claim{65189916};
+inline constexpr ActionType ActionType::Chat{2099064};
+inline constexpr ActionType ActionType::Help{2245473};
+inline constexpr ActionType ActionType::Invite{-2099832023};
+inline constexpr ActionType ActionType::Report{-1850654380};
+inline constexpr ActionType ActionType::Copy{2106261};
+inline constexpr ActionType ActionType::Share{79847359};
 
 enum ActionBehaviour {
   Default             = 1,
@@ -347,8 +359,8 @@ struct FleetsManager : MonoSingleton<FleetsManager> {
   // stays on the raw runtime API.
   bool HasFleetService()
   {
-    static FieldInfo* const field = Class::Raw() ? il2cpp_class_get_field_from_name(Class::Raw(), "_fleetServiceCache")
-                                                 : nullptr;
+    static FieldInfo* const field =
+        Class::Raw() ? il2cpp_class_get_field_from_name(Class::Raw(), "_fleetServiceCache") : nullptr;
     static const MethodInfo* const has_service =
         field ? il2cpp_class_get_method_from_name(il2cpp_class_from_type(il2cpp_field_get_type(field)),
                                                   "get_HasService", 0)
