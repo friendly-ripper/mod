@@ -11,12 +11,11 @@ namespace
 {
 // Unity's internal calls. A missing one (renamed by a Unity upgrade) reads as nothing held.
 struct Input {
-  int (*frame_count)()   = il2cpp::ResolveICall<int()>("UnityEngine.Time::get_frameCount()");
-  bool (*any_key)()      = il2cpp::ResolveICall<bool()>("UnityEngine.Input::get_anyKey()");
-  bool (*any_key_down)() = il2cpp::ResolveICall<bool()>("UnityEngine.Input::get_anyKeyDown()");
-  bool (*key)(KeyCode)   = il2cpp::ResolveICall<bool(KeyCode)>("UnityEngine.Input::GetKeyInt(UnityEngine.KeyCode)");
-  bool (*key_down)(KeyCode) =
-      il2cpp::ResolveICall<bool(KeyCode)>("UnityEngine.Input::GetKeyDownInt(UnityEngine.KeyCode)");
+  il2cpp::ICall<int()>         frame_count{"UnityEngine.Time::get_frameCount()"};
+  il2cpp::ICall<bool()>        any_key{"UnityEngine.Input::get_anyKey()"};
+  il2cpp::ICall<bool()>        any_key_down{"UnityEngine.Input::get_anyKeyDown()"};
+  il2cpp::ICall<bool(KeyCode)> key{"UnityEngine.Input::GetKeyInt(UnityEngine.KeyCode)"};
+  il2cpp::ICall<bool(KeyCode)> key_down{"UnityEngine.Input::GetKeyDownInt(UnityEngine.KeyCode)"};
 };
 
 const Input& Unity()
@@ -61,10 +60,10 @@ void Poll()
 }
 
 bool Pressed(KeyCode key)
-{ return frame.any_held && Unity().key && Unity().key(key); }
+{ return frame.any_held && Unity().key(key); }
 
 bool Down(KeyCode key)
-{ return frame.any_down && Unity().key_down && Unity().key_down(key); }
+{ return frame.any_down && Unity().key_down(key); }
 
 bool IsModified()
 {
