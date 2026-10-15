@@ -3,18 +3,17 @@
 
 #include "config.h"
 #include "patches/patches.h"
-#include "ship_name.h"
 #include "str_utils.h"
 
 #include "prime/fleet.h"
 #include "prime/navigation.h"
-#include "patches/object_tracker.h"
 #include "prime/ui.h"
 #include "prime/viewers.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/tracker.h>
 
 #include <algorithm>
 #include <chrono>
@@ -68,7 +67,7 @@ void CoursePromptPopupViewController_AboutToShow_Hook(auto original, CoursePromp
 bool label_installed = false;
 
 std::string CurrentText(TextLocalizer* label)
-{ return to_string(label->CurrentText()); }
+{ return il2cpp::ToUtf8(label->CurrentText()); }
 
 // The label text this file set, so it is only cleared while it still reads that.
 struct OwnedLabel {
@@ -84,7 +83,7 @@ struct OwnedLabel {
     auto  previous = std::move(text);
     handle.Reset();
     text.clear();
-    if (UnityObject::Alive(label) && label->textOverride() && CurrentText(label) == previous)
+    if (unity::Alive(label) && label->textOverride() && CurrentText(label) == previous)
       label->ClearTextOverride();
   }
 
@@ -110,7 +109,7 @@ struct OwnedLabel {
     }
     if (text == desired && label->textOverride() && current == desired)
       return;
-    label->OverrideLocalizedText(il2cpp_string_new(desired));
+    label->OverrideLocalizedText(il2cpp::NewString(desired));
     text = desired;
   }
 };
@@ -133,18 +132,18 @@ void UpdateLabel()
     return;
   }
 
-  auto*       widget  = ObjectFinder<StarNodeObjectViewerWidget>::Get();
-  const bool  active  = UnityObject::Alive(widget) && widget->isActiveAndEnabled();
+  auto*       widget  = unity::Newest<StarNodeObjectViewerWidget>();
+  const bool  active  = unity::Alive(widget) && widget->isActiveAndEnabled();
   auto*       button  = active ? widget->visitButton() : nullptr;
-  const bool  enabled = UnityObject::Alive(button) && button->isActiveAndEnabled() && button->Interactable();
+  const bool  enabled = unity::Alive(button) && button->isActiveAndEnabled() && button->Interactable();
   const char* desired = nullptr;
   // The ordinary visit path uses the currently selected fleet. The card's cached popup CourseData is only filled on
   // click, so it cannot preview. Toll and wormhole buttons confirm their own way and keep the game's text.
   if (enabled) {
     auto* fleets     = FleetsManager::Instance();
     auto* deployment = DeploymentManager::Instance();
-    auto* fleet      = UnityObject::Alive(fleets) ? fleets->GetSelectedFleetData() : nullptr;
-    if (fleet && UnityObject::Alive(deployment) && deployment->HasInstantWarpAbility(fleet)) {
+    auto* fleet      = unity::Alive(fleets) ? fleets->GetSelectedFleetData() : nullptr;
+    if (fleet && unity::Alive(deployment) && deployment->HasInstantWarpAbility(fleet)) {
       switch (ResolveConfirmation(fleet)) {
         case InstantWarpConfirmation::kWarp:
           desired = "WARP";
@@ -158,15 +157,30 @@ void UpdateLabel()
     }
   }
   auto* label = desired ? button->mainText() : nullptr;
-  action_label.Apply(UnityObject::Alive(label) ? label : nullptr, desired);
+  action_label.Apply(unity::Alive(label) ? label : nullptr, desired);
 }
-} // namespace
 
 void InstantWarpUpdate()
 {
   if (label_installed)
     UpdateLabel();
 }
+
+void InstallInstantWarp()
+{
+  // The hook is useless without both popup actions, so skip it (and the label) when either has drifted.
+  const auto about_to_show = CoursePromptPopupViewController::Class::Method("AboutToShow", 0);
+  if (!about_to_show || !CoursePromptPopupWidget::Class::Method("InitiateRegularWarp", 0)
+      || !CoursePromptPopupWidget::Class::Method("OnInstantWarpButtonClick", 0)) {
+    return;
+  }
+
+  if (!IL2CPP_HOOK(about_to_show, CoursePromptPopupViewController_AboutToShow_Hook))
+    return;
+  label_installed = true;
+  spdlog::info("[WarpActionLabel] system-card action labels enabled");
+}
+} // namespace
 
 void CycleInstantWarpConfirmation()
 {
@@ -186,18 +200,4 @@ void CycleInstantWarpConfirmation()
   spdlog::info("Auto-confirm instant warp set to {}", kNames[static_cast<int>(setting)]);
 }
 
-void InstallInstantWarp()
-{
-  // The hook is useless without both popup actions, so skip it (and the label) when either has drifted.
-  const auto about_to_show = CoursePromptPopupViewController::Class::Method("AboutToShow", 0);
-  if (!about_to_show || !CoursePromptPopupWidget::Class::Method("InitiateRegularWarp", 0)
-      || !CoursePromptPopupWidget::Class::Method("OnInstantWarpButtonClick", 0)) {
-    return;
-  }
-
-  if (!SPUD_STATIC_DETOUR(about_to_show.Pointer(), CoursePromptPopupViewController_AboutToShow_Hook))
-    return;
-  label_installed = InstallFrameTick();
-  if (label_installed)
-    spdlog::info("[WarpActionLabel] system-card action labels enabled");
-}
+const Feature kInstantWarp{"InstantWarp", nullptr, InstallInstantWarp, InstantWarpUpdate};

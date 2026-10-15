@@ -1,3 +1,4 @@
+#include <il2cpp/il2cpp.h>
 #include <il2cpp/method_contract.h>
 #include <il2cpp/runtime.h>
 #include <spdlog/spdlog.h>
@@ -48,7 +49,7 @@ Il2CppObject *Invoke(const MethodInfo *method, Il2CppObject *object, void **args
 std::string Name(RoadDepthApi &api, Il2CppObject *object)
 {
   auto *value = object ? reinterpret_cast<Il2CppString *>(Invoke(api.name, object)) : nullptr;
-  return value && value->length <= 256 ? to_string(value) : std::string{};
+  return value && value->length <= 256 ? il2cpp::ToUtf8(value) : std::string{};
 }
 
 bool IsRoad(const std::string &name)

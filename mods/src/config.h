@@ -150,17 +150,17 @@ public:
 
   // Hook groups. Users switch these off when another mod (such as a BepInEx plugin) hooks the same methods.
   struct Patches {
-    bool pinnedshipclicktoggle = true;
-    bool thinqueueprotectionhooks = true;
-    bool queueaddressguardhooks = true;
-    bool actionqueuerecoveryhooks = true;
-    bool revealconfirmhooks = true;
-    bool chattitledisplayhooks = true;
-    bool interiorzoomhooks = true;
+    bool pinnedshipclicktoggle      = true;
+    bool thinqueueprotectionhooks   = true;
+    bool queueaddressguardhooks     = true;
+    bool actionqueuerecoveryhooks   = true;
+    bool revealconfirmhooks         = true;
+    bool chattitledisplayhooks      = true;
+    bool interiorzoomhooks          = true;
     bool uiscalehooks               = true;
     bool zoomhooks                  = true;
-    bool havenzoomhooks = true;
-    bool havenhistoryhooks = true;
+    bool havenzoomhooks             = true;
+    bool havenhistoryhooks          = true;
     bool bufffixhooks               = true;
     bool toastbannerhooks           = true;
     bool panhooks                   = true;
@@ -194,11 +194,11 @@ public:
 
   struct Control {
     bool primary_requires_visible_target = false;
-    bool kirshara_fixes = true;
-    bool queue_enabled       = true;
-    bool hotkeys_enabled     = true;
-    bool hotkeys_extended    = true;
-    bool use_scopely_hotkeys = false;
+    bool kirshara_fixes                  = true;
+    bool queue_enabled                   = true;
+    bool hotkeys_enabled                 = true;
+    bool hotkeys_extended                = true;
+    bool use_scopely_hotkeys             = false;
     // Milliseconds within which pressing a ship's number again flies the camera to it.
     int  select_timer        = 500;
     bool enable_experimental = false;
@@ -206,14 +206,14 @@ public:
 
   struct Graphics {
     float interior_zoom_scale = 2.0f;
-    float ui_scale        = 0.6f;
-    float ui_scale_step   = 0.05f;
-    float ui_scale_ship   = 1.0f;
-    float ui_scale_viewer = 1.2f;
+    float ui_scale            = 0.6f;
+    float ui_scale_step       = 0.05f;
+    float ui_scale_ship       = 1.0f;
+    float ui_scale_viewer     = 1.2f;
     // The farthest system zoom; presets and zoom shortcuts are in the same unit.
-    float             zoom     = 5000.0f;
-    float haven_zoom = 4000.0f;
-    float             fr_scale = 2.0f;
+    float             zoom       = 5000.0f;
+    float             haven_zoom = 4000.0f;
+    float             fr_scale   = 2.0f;
     FleetLabelProfile zoom_label_player;
     FleetLabelProfile zoom_label_non_player;
     bool              free_resize         = true;
@@ -251,24 +251,24 @@ public:
   } buffs;
 
   struct Audio {
-    bool                     disable_all_events = false;
-    NotificationSound        alert_victory = NotificationSound::None;
-    NotificationSound        alert_defeat = NotificationSound::None;
-    NotificationSound        alert_armada_created = NotificationSound::None;
-    NotificationSound        alert_armada_battle_won = NotificationSound::None;
-    NotificationSound        alert_armada_battle_lost = NotificationSound::None;
+    bool              disable_all_events       = false;
+    NotificationSound alert_victory            = NotificationSound::None;
+    NotificationSound alert_defeat             = NotificationSound::None;
+    NotificationSound alert_armada_created     = NotificationSound::None;
+    NotificationSound alert_armada_battle_won  = NotificationSound::None;
+    NotificationSound alert_armada_battle_lost = NotificationSound::None;
 
     bool                     trace_events = false;
     std::vector<std::string> disabled_events;
   } audio;
 
   struct Ui {
-    bool dock_syncmanagement = true;
+    bool dock_syncmanagement         = true;
     bool auto_confirm_reveal_ability = false;
-    bool show_player_title = true;
-    bool only_show_first_popup = false;
-    bool reverse_haven_history = true;
-    bool disable_escape_exit = true;
+    bool show_player_title           = true;
+    bool only_show_first_popup       = false;
+    bool reverse_haven_history       = true;
+    bool disable_escape_exit         = true;
     // Maximum gap in milliseconds between two Escape presses that opens the exit prompt; 0 never opens it.
     int  disable_escape_exit_timer = 0;
     bool disable_preview_locate    = false;

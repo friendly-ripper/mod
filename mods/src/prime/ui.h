@@ -3,11 +3,13 @@
 // The game's UI framework (Digit.Client.UI): widgets, view controllers, canvases, buttons, lists, localization,
 // shortcuts, message boxes and toasts.
 
-#include "prime/unity.h"
-
 #include <il2cpp/il2cpp.h>
+#include <il2cpp/method_contract.h>
+#include <unity/input.h>
+#include <unity/ui.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 // Unity singletons expose a static Instance on their MonoSingleton`1<T> base.
@@ -68,8 +70,8 @@ struct CanvasController : il2cpp::Object {
   { return Get<"Visible", bool>(); }
   Il2CppString* name()
   { return Get<"name", Il2CppString*>(); }
-  Transform* transform()
-  { return Get<"transform", Transform*>(); }
+  unity::Transform* transform()
+  { return Get<"transform", unity::Transform*>(); }
 
   // The canvas a component is drawn on. Passing System.Type selects GetComponentInParent(Type) over the generic
   // overload.
@@ -93,7 +95,7 @@ struct TextLocalizer : il2cpp::Object {
   { return Field<"m_identifier", Il2CppString*>(); }
   // These localizers render on every UI update, so the identifier is compared without converting it.
   bool IdentifierIs(std::string_view name)
-  { return StringIs(identifier(), name); }
+  { return il2cpp::Equals(identifier(), name); }
   // The backing field, not the SignificantDecimals property.
   void SetSignificantDecimals(int32_t value)
   { SetField<"m_significantDecimals">(value); }
@@ -128,6 +130,21 @@ struct LocaleUtilities {
   static Il2CppString* Localize(LocaleTextContext* context, bool localizeTextParams = false,
                                 bool invariantCulture = false)
   { return Class::Call<"Localize", Il2CppString*>(context, localizeTextParams, invariantCulture); }
+
+  // `identifier` (such as "ship_name_{0}") in `category`, with its one slot filled by `parameter`. Empty when the
+  // text cannot be built. An unknown identifier localizes to itself.
+  static std::string Localize(std::string_view identifier, std::string_view category, Il2CppObject* parameter)
+  {
+    auto* parameters = parameter ? il2cpp::Array<Il2CppObject*>::New(il2cpp::ObjectClass(), 1) : nullptr;
+    auto* context    = parameters
+                           ? il2cpp::New<LocaleTextContext>(il2cpp::NewString(identifier), il2cpp::NewString(category))
+                           : nullptr;
+    if (!context)
+      return {};
+    parameters->Set(0, parameter);
+    context->ApplyIdentifierParameters(parameters);
+    return il2cpp::ToUtf8(Localize(context, false, false));
+  }
 };
 
 struct Localizer {
@@ -155,8 +172,8 @@ struct SemaphoreListenerBase : il2cpp::Object {
 struct SemaphoreButtonListener : SemaphoreListenerBase {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "SemaphoreButtonListener">;
 
-  Button* TheButton()
-  { return Field<"_button", Button*>(); }
+  unity::Button* TheButton()
+  { return Field<"_button", unity::Button*>(); }
 
   // Presses the listener's button, if it has one.
   void Press()
@@ -186,7 +203,7 @@ struct GenericButtonWidget : Widget<GenericButtonContext> {
   { return Get<"Interactable", bool>(); }
 
   // The Unity button behind the widget, or null.
-  Button* TheButton()
+  unity::Button* TheButton()
   {
     auto* listener = SemaphoreListener();
     return listener ? listener->TheButton() : nullptr;
@@ -221,6 +238,13 @@ struct BaseListContainer : il2cpp::Object {
 };
 
 struct SelectableList : BaseListContainer {
+  void Rebuild(il2cpp::Object* provider)
+  {
+    auto* data = Get<"Data", il2cpp::Object*>();
+    if (data)
+      Call<"ClearAndGenerateContents">(provider, data);
+  }
+
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "SelectableList">;
 
   int32_t SelectedIndex()
@@ -251,8 +275,8 @@ struct TabBarViewController : il2cpp::Object {
 struct ScreenManager : MonoSingleton<ScreenManager> {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "ScreenManager">;
 
-  CanvasScaler* canvasRootScaler()
-  { return Field<"m_canvasRootScaler", CanvasScaler*>(); }
+  unity::CanvasScaler* canvasRootScaler()
+  { return Field<"m_canvasRootScaler", unity::CanvasScaler*>(); }
 };
 
 struct ShortcutsManager : MonoSingleton<ShortcutsManager> {
@@ -268,15 +292,15 @@ struct ShortcutsManager : MonoSingleton<ShortcutsManager> {
 
   // Runs one of the On*Action(InputAction.CallbackContext) handlers, as the game's own shortcut for it would.
   template <il2cpp::Name Action> void Run()
-  { Call<Action>(InputActionCallbackContext{}); }
+  { Call<Action>(unity::InputActionCallbackContext{}); }
 };
 
 // The badge next to a button that shows the key of one of the game's input actions.
 struct ShortcutKeybindHint : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.GameInput", "ShortcutKeybindHint">;
 
-  InputActionReference* inputAction()
-  { return Field<"_inputAction", InputActionReference*>(); }
+  unity::InputActionReference* inputAction()
+  { return Field<"_inputAction", unity::InputActionReference*>(); }
   TextLocalizer* keyTextLocalizer()
   { return Field<"_keyTextLocalizer", TextLocalizer*>(); }
 };
@@ -286,6 +310,7 @@ using GameMessageBox = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "Mess
 // MessageBox.ButtonResult
 enum class MessageBoxResult : int32_t {
   Confirm = 1,
+  Yes     = 3,
 };
 
 struct MessageBoxContext : il2cpp::Object {
@@ -386,29 +411,22 @@ struct AnimatedRewardsScreenViewController : il2cpp::Object {
   { return Call<"IsActive", bool>(); }
 };
 
-// Unity's Behaviour.isActiveAndEnabled through its internal call. The selector and artifact hall bindings use it so
-// that a drifted managed binding never hides their arrow-key shortcuts: without the call they count as active.
-inline bool IsActiveAndEnabled(il2cpp::Object* behaviour)
-{
-  static const il2cpp::ICall<bool(il2cpp::Object*)> call{"UnityEngine.Behaviour::get_isActiveAndEnabled()"};
-  return !call || call(behaviour);
-}
-
 // The -/+ stepper on upgrade and quantity screens.
 struct ElementSelectorViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.UI", "ElementSelectorViewController">;
 
+  // Through the internal call, so a drifted managed binding never hides the arrow-key shortcuts.
   bool isActiveAndEnabled()
-  { return IsActiveAndEnabled(this); }
+  { return unity::ActiveAndEnabled(this); }
 
   void PressDecrement()
   {
-    if (auto* button = Field<"_decrementButton", Button*>())
+    if (auto* button = Field<"_decrementButton", unity::Button*>())
       button->Press();
   }
   void PressIncrement()
   {
-    if (auto* button = Field<"_incrementButton", Button*>())
+    if (auto* button = Field<"_incrementButton", unity::Button*>())
       button->Press();
   }
 };
@@ -416,8 +434,9 @@ struct ElementSelectorViewController : il2cpp::Object {
 struct ArtifactHallDetailsViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.ArtifactHall", "ArtifactHallDetailsViewController">;
 
+  // Through the internal call, so a drifted managed binding never hides the arrow-key shortcuts.
   bool isActiveAndEnabled()
-  { return IsActiveAndEnabled(this); }
+  { return unity::ActiveAndEnabled(this); }
 
   void PressLeftArrow()
   {
@@ -445,4 +464,22 @@ struct LegacyComparableProgressBar : il2cpp::Object {
   { return Field<"_snapToValue", bool>(); }
   void SetSnapToValue(bool value)
   { SetField<"_snapToValue">(value); }
+};
+
+struct MessageUtility : il2cpp::Object {
+  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.UI", "MessageUtility">;
+  static void* RevealConfirmationTarget()
+  {
+    const auto* method = il2cpp::contract::Resolve(Class::Raw(), "ShowFreeAbilityConfirmationPopup", true,
+                                                   "System.Void", {"System.Int64", "System.TimeSpan", "System.Action"});
+    return method && !method->has_full_generic_sharing_signature ? il2cpp::contract::Pointer(method) : nullptr;
+  }
+  static bool InvokeActivationAction(Il2CppDelegate* action)
+  {
+    if (!action || !action->method)
+      return false;
+    Il2CppException* exception = nullptr;
+    il2cpp_runtime_invoke(action->method, action->target, nullptr, &exception);
+    return !exception;
+  }
 };

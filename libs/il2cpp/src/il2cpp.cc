@@ -11,19 +11,19 @@
 
 namespace il2cpp
 {
+std::string ClassName(Il2CppClass* klass)
+{
+  if (!klass)
+    return "<null>";
+  if (auto* outer = il2cpp_class_get_declaring_type(klass))
+    return ClassName(outer) + "/" + il2cpp_class_get_name(klass);
+  std::string name = il2cpp_class_get_namespace(klass);
+  return name.empty() ? il2cpp_class_get_name(klass) : name + "." + il2cpp_class_get_name(klass);
+}
+
 namespace
 {
   std::atomic<void (*)(std::string_view)> error_handler = nullptr;
-
-  std::string ClassName(Il2CppClass* klass)
-  {
-    if (!klass)
-      return "<null>";
-    if (auto* outer = il2cpp_class_get_declaring_type(klass))
-      return ClassName(outer) + "/" + il2cpp_class_get_name(klass);
-    std::string name = il2cpp_class_get_namespace(klass);
-    return name.empty() ? il2cpp_class_get_name(klass) : name + "." + il2cpp_class_get_name(klass);
-  }
 
   std::string TypeName(const Il2CppType* type)
   {

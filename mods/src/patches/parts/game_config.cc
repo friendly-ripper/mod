@@ -6,8 +6,8 @@
 
 #include "prime/Hub.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
 
 namespace
 {
@@ -19,14 +19,13 @@ void Model_LoadConfigs_Hook(auto original, Model* _this)
     return;
   const auto& game = Config::Get().game;
   if (!game.settings_url.empty())
-    config->SetPlatformSettingsUrl(il2cpp_string_new(game.settings_url.c_str()));
+    config->SetPlatformSettingsUrl(il2cpp::NewString(game.settings_url.c_str()));
   if (!game.assets_url_override.empty())
-    config->SetAssetUrlOverride(il2cpp_string_new(game.assets_url_override.c_str()));
+    config->SetAssetUrlOverride(il2cpp::NewString(game.assets_url_override.c_str()));
 }
-} // namespace
 
 void InstallGameConfigOverrides()
-{
-  if (auto m = Model::Class::Method("LoadConfigs", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), Model_LoadConfigs_Hook);
-}
+{ IL2CPP_HOOK(Model::Class::Method<void()>("LoadConfigs"), Model_LoadConfigs_Hook); }
+} // namespace
+
+const Feature kGameConfigOverrides{"GameConfigOverrides", &Config::Patches::testpatches, InstallGameConfigOverrides};

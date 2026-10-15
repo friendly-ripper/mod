@@ -3,7 +3,6 @@
 // Chat manager and chat view controllers.
 
 #include "prime/ui.h"
-#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -27,7 +26,7 @@ struct ChatManager : MonoSingleton<ChatManager> {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Chat", "ChatManager">;
 
   void OpenChannel(ChatChannelCategory category = ChatChannelCategory::Alliance)
-  { Call<"OpenChannel">(category, il2cpp_string_new("")); }
+  { Call<"OpenChannel">(category, il2cpp::NewString("")); }
 
   void OpenChannel(ChatChannelCategory category, ChatViewMode viewMode)
   {
@@ -67,8 +66,8 @@ struct ChatPreviewController : il2cpp::Object {
 struct ChatMessageListLocalViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Chat", "ChatMessageListLocalViewController">;
 
-  TMP_InputField* inputField()
-  { return Field<"_inputField", TMP_InputField*>(); }
+  unity::TMP_InputField* inputField()
+  { return Field<"_inputField", unity::TMP_InputField*>(); }
 };
 
 struct FullScreenChatViewController : il2cpp::Object {

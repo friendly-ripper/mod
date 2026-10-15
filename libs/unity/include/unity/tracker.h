@@ -36,14 +36,14 @@ namespace detail
 } // namespace detail
 
 // Starts tracking T and its subclasses. Call while installing hooks, before T's instances are created: instances
-// that already exist are not found.
-template <typename T> void Track()
+// that already exist are not found. Alternate parameterless lifecycle methods support pooled components.
+template <typename T> void Track(std::string_view created = ".ctor", std::string_view released = "OnDestroy")
 {
   detail::StartTracking();
-  // Unity constructs MonoBehaviours through their parameterless constructor.
-  if (auto ctor = T::Class::Method(".ctor", 0); ctor && detail::FirstDetour(ctor.Pointer()))
+  // Both lifecycle methods are parameterless; Unity's constructor and OnDestroy are the defaults.
+  if (auto ctor = T::Class::Method(created, 0); ctor && detail::FirstDetour(ctor.Pointer()))
     IL2CPP_HOOK(ctor, detail::Ctor_Hook);
-  if (auto on_destroy = T::Class::Method("OnDestroy"); on_destroy && detail::FirstDetour(on_destroy.Pointer()))
+  if (auto on_destroy = T::Class::Method(released, 0); on_destroy && detail::FirstDetour(on_destroy.Pointer()))
     IL2CPP_HOOK(on_destroy, detail::OnDestroy_Hook);
 }
 

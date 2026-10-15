@@ -7,9 +7,9 @@
 
 #include "prime/officers.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
 
 #include <string>
 
@@ -30,7 +30,7 @@ Comparer unlocked_first = nullptr, by_index = nullptr;
 Il2CppClass* func_class = nullptr;
 
 Comparer NativeCode(il2cpp::Method method)
-{ return method ? reinterpret_cast<Comparer>(method.Info()->methodPointer) : nullptr; }
+{ return reinterpret_cast<Comparer>(method.Pointer()); }
 
 // SortComparer.Compare always calls the _ascending delegate and negates it for Descending; _descending is never
 // called. So each delegate is a complete comparator: unlocked officers first, then below-deck ability in the given
@@ -76,8 +76,8 @@ SortFunction* NewSortFunction(const char* key, bool roster)
     return nullptr;
 
   // SortFunction's parameterless constructor has no generated code; every field Compare reads is set here.
-  auto* sort = static_cast<SortFunction*>(il2cpp_object_new(SortFunction::Class::Raw()));
-  sort->SetDisplayKey(il2cpp_string_new(key));
+  auto* sort = il2cpp::Allocate<SortFunction>();
+  sort->SetDisplayKey(il2cpp::NewString(key));
   sort->SetAscending(ascending);
   sort->SetDescending(descending);
   return sort;
@@ -86,7 +86,7 @@ SortFunction* NewSortFunction(const char* key, bool roster)
 bool HasBelowDeckOption(il2cpp::List<ProcessingOption*>* options)
 {
   for (auto* option : *options) {
-    const auto key = option ? to_string(option->displayKey()) : std::string();
+    const auto key = option ? il2cpp::ToUtf8(option->displayKey()) : std::string();
     if (key == kRosterKey || key == kAssignmentKey)
       return true;
   }
@@ -123,8 +123,8 @@ void AddBelowDeckOption(il2cpp::List<ProcessingOption*>* options, const char* ke
   if (sorters)
     sorters->Add(sort);
 
-  auto* option = static_cast<ProcessingOption*>(il2cpp_object_new(ProcessingOption::Class::Raw()));
-  option->SetDisplayKey(il2cpp_string_new(key));
+  auto* option = il2cpp::Allocate<ProcessingOption>();
+  option->SetDisplayKey(il2cpp::NewString(key));
   option->SetSortingOption(sort);
   options->Add(option);
 }
@@ -142,7 +142,6 @@ void OfficerSortGenerators_InitializeAssignmentSorters_Hook(auto original, Offic
   if (Config::Get().ui.officer_sort)
     AddBelowDeckOption(_this->assignmentOptions(), kAssignmentKey, false);
 }
-} // namespace
 
 void InstallOfficerSort()
 {
@@ -152,7 +151,10 @@ void InstallOfficerSort()
   auto assignment = OfficerSortGenerators::Class::Method("InitializeAssignmentSorters", 0);
   if (!roster || !assignment)
     return;
-  SPUD_STATIC_DETOUR(roster.Pointer(), OfficerSortGenerators_InitializeOfficerSorters_Hook);
-  SPUD_STATIC_DETOUR(assignment.Pointer(), OfficerSortGenerators_InitializeAssignmentSorters_Hook);
+  IL2CPP_HOOK(roster, OfficerSortGenerators_InitializeOfficerSorters_Hook);
+  IL2CPP_HOOK(assignment, OfficerSortGenerators_InitializeAssignmentSorters_Hook);
   spdlog::info("Officer sort: restored Below Deck Ability sort option");
 }
+} // namespace
+
+const Feature kOfficerSort{"OfficerSort", &Config::Patches::officersorthooks, InstallOfficerSort};

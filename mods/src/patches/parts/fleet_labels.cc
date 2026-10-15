@@ -7,9 +7,9 @@
 
 #include "prime/navigation.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
 
 #include <optional>
 #include <unordered_map>
@@ -223,13 +223,6 @@ void NavigationFleetWidget_OnAboutToReleaseContext_Hook(auto original, Navigatio
   labels.Untrack(_this);
   original(_this);
 }
-} // namespace
-
-void FleetLabelsFollowDepth(NavigationZoom* zoom, NodeDepth depth)
-{ labels.OnDepth(zoom, depth); }
-
-void FleetLabelsAfterZoom(NavigationZoom* zoom)
-{ labels.OnZoomed(zoom); }
 
 void InstallFleetLabels()
 {
@@ -247,9 +240,18 @@ void InstallFleetLabels()
     return;
   }
   labels.installed = true;
-  SPUD_STATIC_DETOUR(update_lod.Pointer(), NavigationLOD_UpdateLOD_Hook);
-  SPUD_STATIC_DETOUR(on_enable.Pointer(), NavigationFleetWidget_OnEnable_Hook);
-  SPUD_STATIC_DETOUR(on_disable.Pointer(), NavigationFleetWidget_OnDisable_Hook);
-  SPUD_STATIC_DETOUR(on_bind.Pointer(), NavigationFleetWidget_OnDidBindContext_Hook);
-  SPUD_STATIC_DETOUR(on_release.Pointer(), NavigationFleetWidget_OnAboutToReleaseContext_Hook);
+  IL2CPP_HOOK(update_lod, NavigationLOD_UpdateLOD_Hook);
+  IL2CPP_HOOK(on_enable, NavigationFleetWidget_OnEnable_Hook);
+  IL2CPP_HOOK(on_disable, NavigationFleetWidget_OnDisable_Hook);
+  IL2CPP_HOOK(on_bind, NavigationFleetWidget_OnDidBindContext_Hook);
+  IL2CPP_HOOK(on_release, NavigationFleetWidget_OnAboutToReleaseContext_Hook);
 }
+} // namespace
+
+void FleetLabelsFollowDepth(NavigationZoom* zoom, NodeDepth depth)
+{ labels.OnDepth(zoom, depth); }
+
+void FleetLabelsAfterZoom(NavigationZoom* zoom)
+{ labels.OnZoomed(zoom); }
+
+const Feature kFleetLabels{"FleetLabels", &Config::Patches::zoomhooks, InstallFleetLabels};

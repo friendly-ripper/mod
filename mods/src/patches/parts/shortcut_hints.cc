@@ -3,18 +3,18 @@
 // action that replaces it.
 
 #include "config.h"
-#include "patches/object_tracker.h"
 #include "patches/patches.h"
 #include "patches/ship_shortcut_hint.h"
 #include "patches/shortcuts.h"
 #include "prime/fleet.h"
 #include "str_utils.h"
+#include <unity/tracker.h>
 
 #include "prime/ui.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
 
 #include <array>
 #include <string_view>
@@ -94,7 +94,7 @@ std::string BadgeText(std::string_view action_name)
   auto hint_action = action->primary;
   if (hint_action >= Action::kSelectShip1 && hint_action <= Action::kSelectShip8) {
     // Use the same context array as FleetBarViewController::RequestSelect(int, bool), not the native dock index.
-    auto* bar     = ObjectFinder<FleetBarViewController>::Get();
+    auto* bar     = unity::Newest<FleetBarViewController>();
     auto* context = bar ? bar->CanvasContext() : nullptr;
     auto* fleets  = context ? context->FleetData() : nullptr;
     hint_action   = ShipShortcutHintAction(hint_action, fleets ? fleets->size() : 0, [fleets](std::size_t position) {
@@ -134,7 +134,7 @@ void ShortcutKeybindHint_UpdateText_Hook(auto original, ShortcutKeybindHint* _th
   auto* action    = reference ? reference->action() : nullptr;
   auto* name      = action ? action->name() : nullptr;
   if (name)
-    label->OverrideLocalizedText(il2cpp_string_new(BadgeText(to_string(name)).c_str()));
+    label->OverrideLocalizedText(il2cpp::NewString(BadgeText(il2cpp::ToUtf8(name)).c_str()));
 }
 
 void ShortcutKeybindHint_UpdateVisibility_Hook(auto original, ShortcutKeybindHint* _this, bool visible)
@@ -178,7 +178,6 @@ void InstallKeybindBadges()
   if (!update_text || !update_visibility)
     return;
 
-  original_update_text = SPUD_STATIC_DETOUR(update_text.Pointer(), ShortcutKeybindHint_UpdateText_Hook);
-  SPUD_STATIC_DETOUR(update_visibility.Pointer(), ShortcutKeybindHint_UpdateVisibility_Hook);
-  installed = true;
+  original_update_text = IL2CPP_HOOK(update_text, ShortcutKeybindHint_UpdateText_Hook);
+  installed = original_update_text && IL2CPP_HOOK(update_visibility, ShortcutKeybindHint_UpdateVisibility_Hook);
 }

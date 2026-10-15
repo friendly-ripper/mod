@@ -10,10 +10,10 @@
 #include "prime/server.h"
 #include "prime/ui.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
 
 #include <cstring>
 #include <string>
@@ -125,51 +125,20 @@ template <typename T, size_t N> bool Contains(const T (&list)[N], T value)
 { return std::ranges::find(list, value) != std::end(list); }
 
 // Toast data comes from a dozen game types whose layouts drift between builds. On Windows, an access violation
-// while reading one is contained and logged here instead of taking the game down.
-template <typename Fn> void Guarded(const char* what, Fn fn)
-{
-#if _WIN32
-  __try {
-    fn();
-  } __except (EXCEPTION_EXECUTE_HANDLER) {
-    spdlog::warn("[Notify] access violation while reading {}", what);
-  }
-#else
-  (void)what;
-  fn();
-#endif
-}
+// while reading one is contained and logged instead of taking the game down.
+using il2cpp::Guarded;
 
-// Localizes identifier (such as "ship_name_{0}") in category with one parameter. Empty when that fails.
+// Localizes `identifier` with one parameter, guarded like the rest of the toast reads.
 std::string Localize(const char* identifier, const char* category, Il2CppObject* parameter)
 {
-  auto* object_class = SystemObject::Raw();
-  if (!object_class || !parameter)
-    return {};
-
   std::string result;
-  Guarded(identifier, [&] {
-    auto* parameters = il2cpp::Array<Il2CppObject*>::New(object_class, 1);
-    auto* context    = il2cpp::New<LocaleTextContext>(il2cpp_string_new(identifier), il2cpp_string_new(category));
-    if (!parameters || !context)
-      return;
-    parameters->Set(0, parameter);
-    context->ApplyIdentifierParameters(parameters);
-    if (auto* text = LocaleUtilities::Localize(context, false, false))
-      result = to_string(text);
-  });
+  Guarded(identifier, [&] { result = LocaleUtilities::Localize(identifier, category, parameter); });
   return result;
-}
-
-Il2CppObject* Box(int64_t value)
-{
-  auto* int64_class = SystemInt64::Raw();
-  return int64_class ? il2cpp_value_box(int64_class, &value) : nullptr;
 }
 
 // NPC and marauder profiles have no name of their own; the game names them by their localization id.
 std::string EnemyName(int64_t loca_id)
-{ return loca_id ? Localize("marauder_name_only_{0}", "navigation", Box(loca_id)) : std::string{}; }
+{ return loca_id ? Localize("marauder_name_only_{0}", "navigation", il2cpp::Box(loca_id)) : std::string{}; }
 
 // A hull's display name: localized by numeric id, then by string id, then derived from its internal key.
 std::string HullName(BattleResultHeader* header, int64_t hull_id)
@@ -184,19 +153,19 @@ std::string HullName(BattleResultHeader* header, int64_t hull_id)
   // An unknown id localizes to the identifier itself.
   if (auto* ids = hull->idRefs()) {
     if (const auto loca_id = ids->locaId()) {
-      auto name = Localize("ship_name_{0}", "ships", Box(loca_id));
+      auto name = Localize("ship_name_{0}", "ships", il2cpp::Box(loca_id));
       if (!name.empty() && name != fmt::format("ship_name_{}", loca_id))
         return name;
     }
     if (auto* loca_string = ids->locaStringId(); loca_string && loca_string->length) {
-      const auto id = to_string(loca_string);
-      auto name = Localize("ship_name_{0}", "ships", reinterpret_cast<Il2CppObject*>(il2cpp_string_new(id.c_str())));
+      const auto id   = il2cpp::ToUtf8(loca_string);
+      auto       name = Localize("ship_name_{0}", "ships", reinterpret_cast<Il2CppObject*>(loca_string));
       if (!name.empty() && name != "ship_name_" + id)
         return name;
     }
   }
   auto* key = hull->name();
-  return key ? toast_text::HullKeyName(to_string(key)) : fmt::format("Hull#{}", hull_id);
+  return key ? toast_text::HullKeyName(il2cpp::ToUtf8(key)) : fmt::format("Hull#{}", hull_id);
 }
 
 // "Player (Ship) vs Enemy (Ship)". Outside PvP a named enemy is enough; its hull class is noise.
@@ -207,13 +176,13 @@ std::string BattleBody(BattleResultHeader* header)
 
   Guarded("the player profile", [&] {
     if (auto* profile = header->PlayerUserProfile())
-      player = to_string(profile->name());
+      player = il2cpp::ToUtf8(profile->name());
   });
   Guarded("the enemy profile", [&] {
     auto* profile = header->EnemyUserProfile();
     if (!profile)
       return;
-    enemy = to_string(profile->name());
+    enemy = il2cpp::ToUtf8(profile->name());
     if (enemy.empty()) {
       auto name = EnemyName(profile->locaId());
       if (name != "Unknown")
@@ -245,9 +214,9 @@ std::string ArmadaCreatedBody(ArmadaCreatedData* data)
     auto* owner    = attack ? attack->Owner() : nullptr;
     auto* target   = attack ? attack->TargetUserProfile() : nullptr;
 
-    const auto tag         = alliance ? to_string(alliance->tag()) : std::string{};
-    auto       owner_name  = owner ? to_string(owner->name()) : std::string{};
-    auto       target_name = target ? to_string(target->name()) : std::string{};
+    const auto tag         = alliance ? il2cpp::ToUtf8(alliance->tag()) : std::string{};
+    auto       owner_name  = owner ? il2cpp::ToUtf8(owner->name()) : std::string{};
+    auto       target_name = target ? il2cpp::ToUtf8(target->name()) : std::string{};
     if (target_name.empty() && target)
       target_name = EnemyName(target->locaId());
     if (owner_name.empty())
@@ -270,9 +239,9 @@ std::vector<std::string> ParameterValues(il2cpp::Array<Il2CppObject*>* parameter
     auto*         element = (*parameters)[i];
     Il2CppString* text    = nullptr;
     if (element) {
-      Guarded("a text parameter", [&] { text = TextOf(static_cast<il2cpp::Object*>(element)); });
+      Guarded("a text parameter", [&] { text = il2cpp::ToString(static_cast<il2cpp::Object*>(element)); });
     }
-    values.push_back(to_string(text));
+    values.push_back(il2cpp::ToUtf8(text));
   }
   return values;
 }
@@ -283,25 +252,18 @@ std::vector<std::string> ParameterValues(il2cpp::Array<Il2CppObject*>* parameter
 std::string FormatFromArrayFields(const std::string& text, Il2CppObject* object, std::string& fields_seen)
 {
   auto best = text;
-  for (auto* cls = object ? il2cpp_object_get_class(object) : nullptr; cls; cls = il2cpp_class_get_parent(cls)) {
-    void* iter = nullptr;
-    while (auto* field = il2cpp_class_get_fields(cls, &iter)) {
-      auto* type = il2cpp_field_get_type(field);
-      if ((il2cpp_field_get_flags(field) & FIELD_ATTRIBUTE_STATIC) || !type
-          || (il2cpp_type_get_type(type) != IL2CPP_TYPE_SZARRAY && il2cpp_type_get_type(type) != IL2CPP_TYPE_ARRAY))
-        continue;
-
-      il2cpp::Array<Il2CppObject*>* array = nullptr;
-      il2cpp_field_get_value(object, field, &array);
-      fields_seen += fmt::format("{}{}[{}]", fields_seen.empty() ? "" : ", ", il2cpp_field_get_name(field),
-                                 array ? std::to_string(array->size()) : "null");
-      if (!array || array->size() == 0)
-        continue;
-      auto candidate = FormatPlaceholders(text, ParameterValues(array));
-      if (toast_text::CountPlaceholders(candidate) < toast_text::CountPlaceholders(best))
-        best = std::move(candidate);
-    }
-  }
+  il2cpp::ForEachInstanceField(object, [&](FieldInfo* field) {
+    if (field->type->type != IL2CPP_TYPE_SZARRAY && field->type->type != IL2CPP_TYPE_ARRAY)
+      return;
+    auto* array = il2cpp::ReadField<il2cpp::Array<Il2CppObject*>*>(object, field);
+    fields_seen += fmt::format("{}{}[{}]", fields_seen.empty() ? "" : ", ", field->name,
+                               array ? std::to_string(array->size()) : "null");
+    if (!array || array->size() == 0)
+      return;
+    auto candidate = FormatPlaceholders(text, ParameterValues(array));
+    if (toast_text::CountPlaceholders(candidate) < toast_text::CountPlaceholders(best))
+      best = std::move(candidate);
+  });
   return best;
 }
 
@@ -332,7 +294,7 @@ std::string ToastText(Toast* toast)
 
   // LocaleUtilities.Localize fills the context's own parameters; the toast may carry them instead.
   if (auto* text = LocaleUtilities::Localize(context, true, false)) {
-    auto result = to_string(text);
+    auto result = il2cpp::ToUtf8(text);
     return result.find('{') == std::string::npos ? result : FormatToastText(result, toast, context);
   }
 
@@ -342,7 +304,7 @@ std::string ToastText(Toast* toast)
     spdlog::debug("[Notify] toast state {} could not be localized", static_cast<int>(toast->State()));
     return {};
   }
-  return FormatToastText(to_string(text), toast, context);
+  return FormatToastText(il2cpp::ToUtf8(text), toast, context);
 }
 
 std::string EventCategory(Toast* toast)
@@ -449,13 +411,13 @@ void ToastObserver_EnqueueOrCombineToast_Hook(auto original, ToastObserver* _thi
   if (ShowBanner(toast))
     original(_this, toast, compare);
 }
-} // namespace
 
 void InstallToasts()
 {
 
-  if (auto m = ToastObserver::Class::Method("EnqueueToast"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ToastObserver_EnqueueToast_Hook);
-  if (auto m = ToastObserver::Class::Method("EnqueueOrCombineToast"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ToastObserver_EnqueueOrCombineToast_Hook);
+  IL2CPP_HOOK(ToastObserver::Class::Method("EnqueueToast"), ToastObserver_EnqueueToast_Hook);
+  IL2CPP_HOOK(ToastObserver::Class::Method("EnqueueOrCombineToast"), ToastObserver_EnqueueOrCombineToast_Hook);
 }
+} // namespace
+
+const Feature kToasts{"Toasts", &Config::Patches::toastbannerhooks, InstallToasts};

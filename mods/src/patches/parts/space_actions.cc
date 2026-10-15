@@ -2,11 +2,11 @@
 // mining, queueing, warping, recalling and repairing from the keyboard, dismissing viewers with Escape, opening a
 // target's cargo when it is scanned, and the action queue switch.
 
+#include "action_queue.h"
 #include "config.h"
 #include "patches/patches.h"
-#include "patches/object_tracker.h"
-#include "patches/input.h"
 #include "patches/shortcuts.h"
+#include <chrono>
 
 #include "prime/Hub.h"
 #include "prime/fleet.h"
@@ -14,8 +14,10 @@
 #include "prime/ui.h"
 #include "prime/viewers.h"
 
+#include <il2cpp/hook.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/input.h>
+#include <unity/tracker.h>
 
 #include <algorithm>
 #include <chrono>
@@ -61,12 +63,11 @@ template <typename T> bool TargetShown(T* widget, const Pressed& pressed)
   return parent && parent->IsShowing();
 }
 
-
 // The cards that show a target or a place in space.
 template <typename... Viewers> struct ViewerList {
   static bool AnyShown()
   {
-    return (std::ranges::any_of(ObjectFinder<Viewers>::GetAll(),
+    return (std::ranges::any_of(unity::Instances<Viewers>(),
                                 [](Viewers* widget) { return widget && Shown(widget->visibilityController()); })
             || ...);
   }
@@ -79,7 +80,7 @@ private:
   template <typename T> static bool Hide()
   {
     bool hid = false;
-    for (auto* widget : ObjectFinder<T>::GetAll()) {
+    for (auto* widget : unity::Instances<T>()) {
       if (widget && Shown(widget->visibilityController())) {
         widget->HideAllViewers();
         hid = true;
@@ -144,7 +145,7 @@ bool ActOnPreScan(PreScanTargetWidget* pre_scan, const Pressed& pressed, FleetPl
   auto* buttons = pre_scan->scanEngageButtonsWidget();
 
   // A mining node's card sits on top of the pre-scan: scan it or start mining.
-  if (auto* mine = ObjectFinder<MiningObjectViewerWidget>::Get(); TargetShown(mine, pressed)) {
+  if (auto* mine = unity::Newest<MiningObjectViewerWidget>(); TargetShown(mine, pressed)) {
     if (pressed.secondary && buttons) {
       buttons->OnScanButtonClicked();
       return true;
@@ -184,7 +185,7 @@ bool ActOnPreScan(PreScanTargetWidget* pre_scan, const Pressed& pressed, FleetPl
     const auto type = TargetHullType(buttons->Context());
     // An armada target whose armada card is already open is joined from that card instead.
     bool can_engage = type != HullType::Any;
-    if (type == HullType::ArmadaTarget && ArmadaViewerShown(ObjectFinder<ArmadaObjectViewerWidget>::Get()))
+    if (type == HullType::ArmadaTarget && ArmadaViewerShown(unity::Newest<ArmadaObjectViewerWidget>()))
       can_engage = false;
     else if (pressed.retry)
       can_engage = true;
@@ -212,7 +213,7 @@ bool ActOnPreScan(PreScanTargetWidget* pre_scan, const Pressed& pressed, FleetPl
 // when the press was used.
 bool ActOnViewer(const Pressed& pressed)
 {
-  if (auto* mine = ObjectFinder<MiningObjectViewerWidget>::Get(); TargetShown(mine, pressed)) {
+  if (auto* mine = unity::Newest<MiningObjectViewerWidget>(); TargetShown(mine, pressed)) {
     if (auto* buttons = mine->scanEngageButtonsWidget(); pressed.secondary && buttons) {
       if (!buttons->Context())
         return false;
@@ -226,7 +227,8 @@ bool ActOnViewer(const Pressed& pressed)
     return false;
   }
 
-  if (auto* node = ObjectFinder<StarNodeObjectViewerWidget>::Get(); node && node->Context()
+  if (auto* node = unity::Newest<StarNodeObjectViewerWidget>();
+      node && node->Context()
       && (!pressed.primary || !Config::Get().control.primary_requires_visible_target || TargetShown(node, pressed))) {
     if (pressed.secondary) {
       node->OnViewButtonActivation();
@@ -239,11 +241,11 @@ bool ActOnViewer(const Pressed& pressed)
     return false;
   }
 
-  auto* navigation = ObjectFinder<NavigationInteractionUIViewController>::Get();
+  auto* navigation = unity::Newest<NavigationInteractionUIViewController>();
   if (!navigation || !pressed.primary)
     return false;
 
-  auto* armada = ObjectFinder<ArmadaObjectViewerWidget>::Get();
+  auto* armada = unity::Newest<ArmadaObjectViewerWidget>();
   if (!ArmadaViewerShown(armada)) {
     if (Config::Get().control.primary_requires_visible_target && !navigation->IsSetCourseVisible())
       return false;
@@ -275,7 +277,7 @@ void ActOnSelectedFleet(FleetBarViewController* fleet_bar, const Pressed& presse
     return;
   }
 
-  for (auto* pre_scan : ObjectFinder<PreScanTargetWidget>::GetAll())
+  for (auto* pre_scan : unity::Instances<PreScanTargetWidget>())
     if (TargetShown(pre_scan, pressed) && ActOnPreScan(pre_scan, pressed, fleet, queue))
       return;
 
@@ -294,7 +296,7 @@ void ActOnSelectedFleet(FleetBarViewController* fleet_bar, const Pressed& presse
 // Toggles a shown pre-scan card's cargo panel. Opening is retried for a few frames, see show_cargo_frames.
 void ToggleTargetCargo()
 {
-  for (auto* pre_scan : ObjectFinder<PreScanTargetWidget>::GetAll()) {
+  for (auto* pre_scan : unity::Instances<PreScanTargetWidget>()) {
     auto* rewards = pre_scan ? pre_scan->rewardsButtonWidget() : nullptr;
     auto* cargo   = rewards ? rewards->rewardsController() : nullptr;
     if (!cargo || !Shown(pre_scan->visibilityController()))
@@ -308,7 +310,7 @@ void ToggleTargetCargo()
 
 void ShowPendingTargetCargo()
 {
-  for (auto* pre_scan : ObjectFinder<PreScanTargetWidget>::GetAll()) {
+  for (auto* pre_scan : unity::Instances<PreScanTargetWidget>()) {
     auto* rewards = pre_scan ? pre_scan->rewardsButtonWidget() : nullptr;
     auto* cargo   = rewards ? rewards->rewardsController() : nullptr;
     if (cargo && Shown(pre_scan->visibilityController()) && !cargo->IsShown())
@@ -373,6 +375,9 @@ void ViewSelectedFleet(FleetPlayerData* fleet)
   if (auto* fleets = FleetsManager::Instance())
     fleets->RequestViewFleet(fleet, true);
 }
+
+void InstallQueueSwitch()
+{ IL2CPP_HOOK(ActionQueueManager::Class::Method("IsQueueUnlocked"), ActionQueueManager_IsQueueUnlocked_Hook); }
 } // namespace
 
 bool TargetViewerShown()
@@ -393,10 +398,10 @@ bool SelectShipShortcuts()
     ++index;
   // TODO: Shift+ship used to request a tow by the Discovery. Its bindings had drifted, so it never ran on
   // recent clients, and it was disabled until someone verifies it in game. Shift+ship does nothing meanwhile.
-  if (index == 8 || Key::IsInputFocused())
+  if (index == 8 || unity::Key::IsInputFocused())
     return false;
 
-  auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+  auto* fleet_bar = unity::Newest<FleetBarViewController>();
   if (!fleet_bar)
     return false;
 
@@ -419,7 +424,7 @@ bool SelectShipShortcuts()
 bool FleetShortcuts()
 {
   if (Shortcut::IsDown(Action::kSelectCurrent)) {
-    auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+    auto* fleet_bar = unity::Newest<FleetBarViewController>();
     if (auto* fleet = fleet_bar ? fleet_bar->SelectedFleet() : nullptr) {
       ViewSelectedFleet(fleet);
       return true;
@@ -438,16 +443,16 @@ bool FleetActionShortcuts()
 {
   // A replay lives for exactly the next frame, whatever that frame does.
   const auto replayed = std::exchange(replay, std::nullopt);
-  if (Key::IsInputFocused())
+  if (unity::Key::IsInputFocused())
     return false;
 
-  if (Key::Pressed(KeyCode::Escape) && TargetViewers::HideFirst())
+  if (unity::Key::Pressed(unity::KeyCode::Escape) && TargetViewers::HideFirst())
     return true;
 
   // Escape or the primary action dismisses the golden rewards screen. Down, not Pressed: a held Escape would go
   // back a section every frame while the screen closes.
-  if (Shortcut::IsDown(Action::kActionPrimary) || Key::Down(KeyCode::Escape)) {
-    if (auto* rewards = ObjectFinder<AnimatedRewardsScreenViewController>::Get(); rewards && rewards->IsActive()) {
+  if (Shortcut::IsDown(Action::kActionPrimary) || unity::Key::Down(unity::KeyCode::Escape)) {
+    if (auto* rewards = unity::Newest<AnimatedRewardsScreenViewController>(); rewards && rewards->IsActive()) {
       rewards->GoBackToLastSection();
       return true;
     }
@@ -469,7 +474,7 @@ bool FleetActionShortcuts()
     pressed.retry = true;
   }
   if (pressed.Any() && Hub::IsInSystemOrGalaxyOrStarbase() && !Hub::IsInChat())
-    if (auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get())
+    if (auto* fleet_bar = unity::Newest<FleetBarViewController>())
       ActOnSelectedFleet(fleet_bar, pressed);
 
   if (Shortcut::IsDown(Action::kActionView))
@@ -479,16 +484,49 @@ bool FleetActionShortcuts()
   return false;
 }
 
-void InstallQueueSwitch()
-{
-  if (auto m = ActionQueueManager::Class::Method("IsQueueUnlocked"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ActionQueueManager_IsQueueUnlocked_Hook);
-}
-
 void InstallFleetActions()
 {
-  if (auto m = RewardsButtonWidget::Class::Method("OnDidBindContext"))
-    SPUD_STATIC_DETOUR(m.Pointer(), RewardsButtonWidget_OnDidBindContext_Hook);
-  if (auto m = PreScanTargetWidget::Class::Method("ShowWithFleet"))
-    SPUD_STATIC_DETOUR(m.Pointer(), PreScanTargetWidget_ShowWithFleet_Hook);
+  IL2CPP_HOOK(RewardsButtonWidget::Class::Method("OnDidBindContext"), RewardsButtonWidget_OnDidBindContext_Hook);
+  IL2CPP_HOOK(PreScanTargetWidget::Class::Method("ShowWithFleet"), PreScanTargetWidget_ShowWithFleet_Hook);
 }
+
+const Feature kQueueSwitch{"QueueSwitch", &Config::Patches::testpatches, InstallQueueSwitch};
+
+namespace
+{
+void UpdateExpiredAbilityButtons()
+{
+  static auto next_update = std::chrono::steady_clock::time_point{};
+  const auto  now         = std::chrono::steady_clock::now();
+  if (now < next_update)
+    return;
+  next_update      = now + std::chrono::milliseconds(250);
+  auto* bar        = unity::Newest<FleetBarViewController>();
+  auto* controller = bar ? bar->fleetPanelController() : nullptr;
+  auto* fleet      = controller ? controller->fleet() : nullptr;
+  if (!fleet || (static_cast<int>(fleet->CurrentState()) & static_cast<int>(FleetState::CanActivateAbility)) == 0)
+    return;
+  auto* manager = ActivatedAbilityManager::Instance();
+  auto* panel   = controller->shipActionPanelLocalViewController();
+  auto* canvas  = panel ? CanvasController::Of(panel) : nullptr;
+  if (!manager || !canvas || !canvas->Visible() || panel->HasShipAnActiveAbilityWithActiveEffect())
+    return;
+  auto* ids     = panel->abilityIDs();
+  auto* buttons = panel->buttons();
+  if (!ids || !buttons)
+    return;
+  for (size_t index = 0; index < ids->size() && index < buttons->size(); ++index) {
+    auto* button  = (*buttons)[index];
+    auto* context = button ? button->Context() : nullptr;
+    if (!button || !button->isActiveAndEnabled() || !context || context->Interactable())
+      continue;
+    const auto ability_id = (*ids)[index];
+    auto*      timer      = panel->GetRemainingCooldown(ability_id);
+    // TimeSpan is an eight-byte value in 100 ns ticks. Repair at -1 second or below.
+    if (timer && timer->RemainingTime().ticks <= -10000000 && manager->CanUseAbility(fleet, ability_id))
+      context->SetInteractable(true);
+  }
+}
+
+} // namespace
+const Feature kAbilityButtons{"AbilityButtons", &Config::Patches::hotkeyhooks, nullptr, UpdateExpiredAbilityButtons};

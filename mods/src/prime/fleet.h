@@ -6,7 +6,6 @@
 #include "prime/Hub.h"
 #include "prime/server.h"
 #include "prime/ui.h"
-#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -136,10 +135,10 @@ struct FleetPlayerData : il2cpp::Object {
     const auto loca_id = Hull() ? GetLocaId() : 0;
     if (loca_id <= 0)
       return {};
-    auto* context = il2cpp::New<LocaleTextContext>(il2cpp_string_new(("ship_name_" + std::to_string(loca_id)).c_str()),
-                                                   il2cpp_string_new("ships"));
+    auto* context = il2cpp::New<LocaleTextContext>(il2cpp::NewString("ship_name_" + std::to_string(loca_id)),
+                                                   il2cpp::NewString("ships"));
     auto* name    = context ? Localizer::Localise(context) : nullptr;
-    return name ? to_string(name) : std::string();
+    return name ? il2cpp::ToUtf8(name) : std::string();
   }
 };
 
@@ -170,9 +169,9 @@ enum class ActionBehaviour : int32_t {
   RequestConfirmation = 32,
 };
 
-
-
-struct AbilityTimeSpan { int64_t ticks; };
+struct AbilityTimeSpan {
+  int64_t ticks;
+};
 
 struct AbilityTimerDataContext : il2cpp::Object {
   using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Models", "TimerDataContext">;
@@ -293,8 +292,8 @@ struct ActionQueueManager : MonoSingleton<ActionQueueManager> {
 struct FleetMeshSelector : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "FleetMeshSelector">;
 
-  GameObject* LoadedObject()
-  { return Get<"LoadedObject", GameObject*>(); }
+  unity::GameObject* LoadedObject()
+  { return Get<"LoadedObject", unity::GameObject*>(); }
 };
 
 struct CourseData : il2cpp::Object {
@@ -341,10 +340,10 @@ struct ShipManagementScreenStateViewController : il2cpp::Object {
 
   bool isActiveAndEnabled()
   { return Get<"isActiveAndEnabled", bool>(); }
-  Button* officerIconButton()
-  { return Field<"_officerIconButton", Button*>(); }
-  Button* swapShipButton()
-  { return Field<"_swapShipButton", Button*>(); }
+  unity::Button* officerIconButton()
+  { return Field<"_officerIconButton", unity::Button*>(); }
+  unity::Button* swapShipButton()
+  { return Field<"_swapShipButton", unity::Button*>(); }
 };
 
 struct AssignShipsWidget : il2cpp::Object {
@@ -387,7 +386,7 @@ struct PlanetaryBaseManager : MonoSingleton<PlanetaryBaseManager> {
 struct ActivatedAbilityManager : MonoSingleton<ActivatedAbilityManager> {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.ActivatedAbilities", "ActivatedAbilityManager">;
   static constexpr int32_t RevealHostileVgerAbilityType = 86002;
-  int32_t GetActivatedAbilityType(int64_t abilityId)
+  int32_t                  GetActivatedAbilityType(int64_t abilityId)
   { return Call<"GetActivatedAbilityType", int32_t>(abilityId); }
   bool CanUseAbility(FleetPlayerData* fleet, int64_t abilityId)
   { return Call<"CanUseAbility", bool>(fleet, abilityId); }

@@ -4,17 +4,17 @@
 
 #include "config.h"
 #include "patches/patches.h"
-#include "patches/input.h"
 #include "patches/shortcuts.h"
 
 #include "prime/Hub.h"
 #include "prime/navigation.h"
 #include "prime/ui.h"
-#include "prime/unity.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/input.h>
+#include <unity/ui.h>
 
 #include <cmath>
 #include <optional>
@@ -65,7 +65,7 @@ void ApplyZoomRange(NavigationZoom* zoom, float radius)
   }
   if (auto* camera = zoom->sceneCamera()) {
     camera->SetFarClipPlane(max_zoom * 3.75f);
-    camera->SetClearFlags(2); // CameraClearFlags.SolidColor
+    camera->SetClearFlags(unity::Camera::ClearFlags::SolidColor);
     camera->SetBackgroundColor({0, 0, 0, 0});
   }
 }
@@ -86,7 +86,7 @@ void KeepZoomRange(NavigationZoom* zoom)
 // Zooms around the mouse pointer, either by `delta` or (with `absolute`) to a preset value.
 void ZoomAtMouse(NavigationZoom* zoom, float value, bool absolute)
 {
-  const auto mouse = Input::mousePosition();
+  const auto mouse = unity::Input::mousePosition();
   zoom->SetZoomLocation({mouse.x, mouse.y});
   if (absolute) {
     zoom->SetDistance(zoom->minimum() + (zoom->maximum() - zoom->minimum()) * (value / Config::Get().graphics.zoom));
@@ -95,7 +95,7 @@ void ZoomAtMouse(NavigationZoom* zoom, float value, bool absolute)
     zoom->SetLastZoomDelta(value);
   }
   auto* camera = zoom->sceneCamera();
-  zoom->SetWorldPoint(camera ? MathUtils::GetMouseWorldPos(camera, mouse) : Vector3{});
+  zoom->SetWorldPoint(camera ? MathUtils::GetMouseWorldPos(camera, mouse) : unity::Vector3{});
   zoom->ZoomCameraAtWorldPoint();
 }
 
@@ -138,7 +138,7 @@ bool KeyboardZoom(NavigationZoom* zoom)
   if (target != 0.0f) {
     ZoomAtMouse(zoom, target, true);
   } else {
-    const float step = config.graphics.keyboard_zoom_speed * Time::deltaTime();
+    const float step = config.graphics.keyboard_zoom_speed * unity::Time::deltaTime();
     if (shortcuts && Shortcut::IsPressed(Action::kZoomIn))
       ZoomAtMouse(zoom, step, false);
     else if (shortcuts && Shortcut::IsPressed(Action::kZoomOut))
@@ -153,7 +153,7 @@ bool KeyboardZoom(NavigationZoom* zoom)
 
 void NavigationZoom_Update_Hook(auto original, NavigationZoom* _this)
 {
-  Key::Poll();
+  unity::Key::Poll();
   FleetLabelsFollowDepth(_this, _this->depth());
   KeepZoomRange(_this);
 
@@ -161,7 +161,7 @@ void NavigationZoom_Update_Hook(auto original, NavigationZoom* _this)
   bool run_game_update = true;
   if (std::exchange(zoom_to_default, false))
     ZoomAtMouse(_this, Config::Get().graphics.default_system_zoom, true);
-  else if (!Key::IsInputFocused())
+  else if (!unity::Key::IsInputFocused())
     run_game_update = KeyboardZoom(_this);
   if (!run_game_update)
     return;
@@ -193,12 +193,12 @@ void NavigationZoom_SetDepth_Hook(auto original, NavigationZoom* _this, NodeDept
 // Planet flat renderables (the 2D planet sprites) are scaled by fr_scale. The game reuses them and asks for them on
 // every zoom, so each transform remembers the size it was scaled to and is left alone while it still has it.
 // Planets differ in base size, so this is per transform: one shared value made two planets rescale each other.
-void ScaleFlatRenderable(Component* renderable)
+void ScaleFlatRenderable(unity::Component* renderable)
 {
   // A system has a handful of planets; past this, entries from earlier systems are dropped.
-  constexpr size_t                             kRemembered = 256;
-  static std::unordered_map<Transform*, float> scaled;
-  const float                                  factor = Config::Get().graphics.fr_scale;
+  constexpr size_t                                    kRemembered = 256;
+  static std::unordered_map<unity::Transform*, float> scaled;
+  const float                                         factor = Config::Get().graphics.fr_scale;
   auto* transform = renderable && factor > 0.0f && factor != 1.0f ? renderable->transform() : nullptr;
   if (!transform)
     return;
@@ -211,7 +211,7 @@ void ScaleFlatRenderable(Component* renderable)
   scaled.insert_or_assign(transform, scale.x * factor);
 }
 
-Component* PlanetViewUtils_get_FlatRenderable_Hook(auto original, PlanetViewUtils* _this)
+unity::Component* PlanetViewUtils_get_FlatRenderable_Hook(auto original, PlanetViewUtils* _this)
 {
   auto* renderable = original(_this);
   ScaleFlatRenderable(renderable);
@@ -237,13 +237,14 @@ bool ModMovesCamera()
 }
 
 bool PointerHeld()
-{ return Input::GetMouseButton(0) || Input::touchCount() > 0; }
+{ return unity::Input::GetMouseButton(0) || unity::Input::touchCount() > 0; }
 
 // The game's own tutorial and modal/text-input gates for keyboard panning.
 bool KeyboardPanAllowed()
 {
   auto* manager = Hub::Tutorial();
-  return manager && manager->IsSceneInputAllowed() && ShortcutsManager::CanUseShortcuts() && !Key::IsInputFocused();
+  return manager && manager->IsSceneInputAllowed() && ShortcutsManager::CanUseShortcuts()
+         && !unity::Key::IsInputFocused();
 }
 
 // Replaces the game's LateUpdate: the keyboard source is the mod's shortcuts, and the pan keeps gliding after the
@@ -251,11 +252,11 @@ bool KeyboardPanAllowed()
 // glide.
 bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
 {
-  Key::Poll();
+  unity::Key::Poll();
   const auto& config = Config::Get();
   // An arrow held for a CTRL-arrow style shortcut must not pan as well, natively or through the mod.
-  const bool arrow_owned = Shortcut::Owns(KeyCode::LeftArrow) || Shortcut::Owns(KeyCode::RightArrow)
-                           || Shortcut::Owns(KeyCode::UpArrow) || Shortcut::Owns(KeyCode::DownArrow);
+  const bool arrow_owned = Shortcut::Owns(unity::KeyCode::LeftArrow) || Shortcut::Owns(unity::KeyCode::RightArrow)
+                           || Shortcut::Owns(unity::KeyCode::UpArrow) || Shortcut::Owns(unity::KeyCode::DownArrow);
   const bool keyboard    = config.control.hotkeys_enabled && !config.ui.disable_move_keys && !arrow_owned;
 
   // With the game's own hotkeys, its LateUpdate pans and glides by itself; only the extended range is ours.
@@ -277,7 +278,7 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
       d.x     = -x / length * _this->keyboardDeltaScaler();
       d.y     = -y / length * _this->keyboardDeltaScaler();
       by_keys = true;
-      _this->MoveCamera(Vector2{d.x * _this->deltaScaler(), d.y * _this->deltaScaler()}, true);
+      _this->MoveCamera(unity::Vector2{d.x * _this->deltaScaler(), d.y * _this->deltaScaler()}, true);
     }
   }
 
@@ -287,7 +288,7 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
     const auto falloff = config.graphics.system_pan_momentum_falloff;
     d.x *= falloff;
     d.y *= falloff;
-    _this->MoveCamera(Vector2{d.x, d.y}, true);
+    _this->MoveCamera(unity::Vector2{d.x, d.y}, true);
   }
   _this->SetLastDelta(d);
   _this->SetFarMagRadiusRatioSystemExtended(_this->farMagRadiusRatioSystemNormal());
@@ -295,18 +296,18 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
 }
 
 // Move left and right rotate the camera around the station.
-void OrbitFrameProvider_UpdateInputData_Hook(auto original, OrbitFrameProvider* _this, Camera* primary_camera)
+void OrbitFrameProvider_UpdateInputData_Hook(auto original, OrbitFrameProvider* _this, unity::Camera* primary_camera)
 {
   original(_this, primary_camera);
-  Key::Poll();
+  unity::Key::Poll();
 
   auto* sections = Hub::Sections();
   if (!ModMovesCamera() || !sections || sections->CurrentSection() != SectionID::Starbase_Exterior
-      || Key::IsInputFocused())
+      || unity::Key::IsInputFocused())
     return;
 
   constexpr float kDegreesPerSecond = 45.0f;
-  const float     step              = kDegreesPerSecond * Time::deltaTime();
+  const float     step              = kDegreesPerSecond * unity::Time::deltaTime();
   if (Shortcut::IsPressed(Action::kMoveLeft))
     _this->SetRotationAngleDelta(_this->RotationAngleDelta() - step);
   if (Shortcut::IsPressed(Action::kMoveRight))
@@ -314,39 +315,35 @@ void OrbitFrameProvider_UpdateInputData_Hook(auto original, OrbitFrameProvider* 
 }
 
 // A held touch reports Stationary, which the game's pan ignores; report it as moving so drags keep panning.
-TKTouch* TKTouch_populateWithPosition_Hook(auto original, TKTouch* _this, uintptr_t pos, TouchPhase phase)
+TKTouch* TKTouch_populateWithPosition_Hook(auto original, TKTouch* _this, uintptr_t pos, unity::TouchPhase phase)
 {
   auto* touch = original(_this, pos, phase);
-  if (touch && touch->phase() == TouchPhase::Stationary)
-    touch->SetPhase(TouchPhase::Moved);
+  if (touch && touch->phase() == unity::TouchPhase::Stationary)
+    touch->SetPhase(unity::TouchPhase::Moved);
   return touch;
 }
-} // namespace
 
 void InstallZoom()
 {
-  if (auto method = PlanetViewUtils::Class::Method("CameraZoomedEventHandler"))
-    SPUD_STATIC_DETOUR(method.Pointer(), PlanetViewUtils_CameraZoomedEventHandler_Hook);
-  if (auto method = PlanetViewUtils::Class::Method("get_FlatRenderable"))
-    SPUD_STATIC_DETOUR(method.Pointer(), PlanetViewUtils_get_FlatRenderable_Hook);
-  if (auto method = NavigationZoom::Class::Method("Update"))
-    SPUD_STATIC_DETOUR(method.Pointer(), NavigationZoom_Update_Hook);
+  IL2CPP_HOOK(PlanetViewUtils::Class::Method("CameraZoomedEventHandler"),
+              PlanetViewUtils_CameraZoomedEventHandler_Hook);
+  IL2CPP_HOOK(PlanetViewUtils::Class::Method("get_FlatRenderable"), PlanetViewUtils_get_FlatRenderable_Hook);
+  IL2CPP_HOOK(NavigationZoom::Class::Method("Update"), NavigationZoom_Update_Hook);
   // TODO: SetDepth has only ever been detoured on Windows and the reason was not recorded; check its prologue
   // against SPUD's overwrite size before enabling it on macOS.
 #if _WIN32
-  if (auto method = NavigationZoom::Class::Method("SetDepth"))
-    SPUD_STATIC_DETOUR(method.Pointer(), NavigationZoom_SetDepth_Hook);
+  IL2CPP_HOOK(NavigationZoom::Class::Method("SetDepth"), NavigationZoom_SetDepth_Hook);
 #endif
-  if (auto method = NavigationZoom::Class::Method("SetViewParameters"))
-    SPUD_STATIC_DETOUR(method.Pointer(), NavigationZoom_SetViewParameters_Hook);
+  IL2CPP_HOOK(NavigationZoom::Class::Method("SetViewParameters"), NavigationZoom_SetViewParameters_Hook);
 }
 
 void InstallPan()
 {
-  if (auto method = OrbitFrameProvider::Class::Method("UpdateInputData"))
-    SPUD_STATIC_DETOUR(method.Pointer(), OrbitFrameProvider_UpdateInputData_Hook);
-  if (auto method = TKTouch::Class::Method("populateWithPosition"))
-    SPUD_STATIC_DETOUR(method.Pointer(), TKTouch_populateWithPosition_Hook);
-  if (auto method = NavigationPan::Class::Method("LateUpdate"))
-    SPUD_STATIC_DETOUR(method.Pointer(), NavigationPan_LateUpdate_Hook);
+  IL2CPP_HOOK(OrbitFrameProvider::Class::Method("UpdateInputData"), OrbitFrameProvider_UpdateInputData_Hook);
+  IL2CPP_HOOK(TKTouch::Class::Method("populateWithPosition"), TKTouch_populateWithPosition_Hook);
+  IL2CPP_HOOK(NavigationPan::Class::Method("LateUpdate"), NavigationPan_LateUpdate_Hook);
 }
+} // namespace
+
+const Feature kZoom{"Zoom", &Config::Patches::zoomhooks, InstallZoom};
+const Feature kPan{"Pan", &Config::Patches::panhooks, InstallPan};

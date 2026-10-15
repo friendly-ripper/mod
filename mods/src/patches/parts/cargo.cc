@@ -7,9 +7,9 @@
 #include "prime/server.h"
 #include "prime/ui.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
 
 #include <algorithm>
 
@@ -42,7 +42,7 @@ bool IsCargoText(LegacyComparableProgressBar* self)
     if (!reported) {
       reported = true;
       spdlog::warn("[InstantCargoText] cargo label has unexpected context {}; native text retained",
-                   context ? il2cpp_class_get_name(context->klass) : "null");
+                   context ? il2cpp::ClassName(context->klass) : "null");
     }
     return false;
   }
@@ -63,16 +63,6 @@ void SetWidgetData_Hook(auto original, LegacyComparableProgressBar* self)
   self->SetSnapToValue(previous);
 }
 #endif
-} // namespace
-
-void InstallCargoFormat()
-{
-  if (auto method = ColourTextLocalizer::Class::Method("SetLocalTextParameters")) {
-    SPUD_STATIC_DETOUR(method.Pointer(), ColourTextLocalizer_SetLocalTextParameters_Hook);
-    spdlog::info("Cargo format: significant decimals = {}", SignificantDecimals());
-  }
-}
-
 void InstallInstantCargo()
 {
   // TODO: Windows x64 only. Enabling it on macOS needs SetWidgetData's prologue checked against SPUD's detour size.
@@ -81,9 +71,20 @@ void InstallInstantCargo()
   // The lookup walks parents; only detour the bar's own override, never the shared Widget`1.SetWidgetData.
   if (!method || method.Info()->klass != LegacyComparableProgressBar::Class::Raw())
     return;
-  const bool installed = SPUD_STATIC_DETOUR(method.Pointer(), SetWidgetData_Hook) != nullptr;
+  const bool installed = IL2CPP_HOOK(method, SetWidgetData_Hook) != nullptr;
   spdlog::info("[InstantCargoText] native text hook {}", installed ? "installed" : "unavailable");
 #else
   spdlog::info("[InstantCargoText] native text snap is not supported on this platform");
 #endif
 }
+
+void InstallCargoFormat()
+{
+  if (IL2CPP_HOOK(ColourTextLocalizer::Class::Method("SetLocalTextParameters"),
+                  ColourTextLocalizer_SetLocalTextParameters_Hook))
+    spdlog::info("Cargo format: significant decimals = {}", SignificantDecimals());
+}
+} // namespace
+
+const Feature kInstantCargo{"InstantCargo", &Config::Patches::instantcargocounterhooks, InstallInstantCargo};
+const Feature kCargoFormat{"CargoFormat", &Config::Patches::cargoformathooks, InstallCargoFormat};

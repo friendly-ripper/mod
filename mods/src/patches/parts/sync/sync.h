@@ -8,6 +8,7 @@
 // destroyed: static destructors at exit must not free state another thread is still using.
 
 #include "config.h"
+
 #include "prime/server.h"
 
 #include <nlohmann/json.hpp>

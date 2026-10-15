@@ -1,47 +1,62 @@
 #pragma once
 
-// The mod's features: what mod.cc installs, and the few calls the frame tick and the shortcut dispatch in hotkeys.cc
-// make into the features that own the work. Grouped by the file that defines them.
+// The mod's features: the descriptors mod.cc installs, and the calls the shortcut dispatch in hotkeys.cc makes into
+// the features that own the work. Grouped by the file that defines them.
+
+#include "config.h"
 
 #include <cstdint>
 
 struct NavigationZoom;
 enum class NodeDepth : int32_t;
 
+// What mod.cc installs. Only the [patches] hook groups decide what is installed, so users can avoid clashing with
+// other mods; feature settings are read inside the hooks, which keeps every feature switchable at runtime.
+struct Feature {
+  const char* name;
+  // The [patches] group that installs it; null for the few that always install.
+  bool Config::Patches::* group;
+  // Null for frame work that needs no hooks.
+  void (*install)();
+  // Runs every frame from the frame tick once installed, in every hotkey mode, before the shortcuts. Returns at once
+  // when its feature is off.
+  void (*frame)() = nullptr;
+};
+
 // anomaly_timer.cc
-void InstallAnomalyTimer();
-void AnomalyTimerUpdate();
+extern const Feature kAnomalyTimer;
 
 // audio.cc
-void InstallAudio();
+extern const Feature kAudio;
 
 // buffs.cc
-void InstallOutOfDockPower();
-void InstallBuffCrashGuard();
+extern const Feature kOutOfDockPower;
+extern const Feature kBuffCrashGuard;
 
 // camera.cc
-void InstallZoom();
-void InstallPan();
+extern const Feature kZoom;
+extern const Feature kPan;
 
 // cargo.cc
-void InstallCargoFormat();
-void InstallInstantCargo();
+extern const Feature kCargoFormat;
+extern const Feature kInstantCargo;
 
 // chat.cc
-void InstallChat();
+extern const Feature kChat;
 // Opens chat, or focuses side chat's input. Never swallows the key.
 void OpenChatShortcut();
 // In chat, the channel shortcuts. True when the key was used.
 bool ChatChannelShortcuts();
 
 // dock.cc
-void InstallPinnedShips();
-void InstallDoubleClickAssign();
-void DockUpdate();
+extern const Feature kPinnedShips;
+extern const Feature kDoubleClickAssign;
+extern const Feature kAssignOnEnter;
 
 // fleet_actions.cc
+extern const Feature kQueueSwitch;
+// The pre-scan cargo hooks; installed with the hotkeys.
 void InstallFleetActions();
-void InstallQueueSwitch();
 // A target or object viewer card is open in space.
 bool TargetViewerShown();
 // The number keys. True when the key was used.
@@ -52,46 +67,43 @@ bool FleetShortcuts();
 bool FleetActionShortcuts();
 
 // fleet_labels.cc, fed by camera.cc's zoom hooks.
-void InstallFleetLabels();
-void FleetLabelsFollowDepth(NavigationZoom* zoom, NodeDepth depth);
-void FleetLabelsAfterZoom(NavigationZoom* zoom);
+extern const Feature kFleetLabels;
+void                 FleetLabelsFollowDepth(NavigationZoom* zoom, NodeDepth depth);
+void                 FleetLabelsAfterZoom(NavigationZoom* zoom);
 
 // forbidden_tech.cc
-void InstallForbiddenTechConfirm();
+extern const Feature kForbiddenTechConfirm;
 
 // game_config.cc
-void InstallGameConfigOverrides();
+extern const Feature kGameConfigOverrides;
 
 // hotkeys.cc
-void InstallHotkeys();
-// ScreenManager.Update is the mod's frame tick: it runs the *Update functions here, then the shortcut dispatch.
-// Features that poll every frame call this from their install. Safe to call more than once; false when the game
-// lacks the method.
-bool InstallFrameTick();
+extern const Feature kHotkeys;
+// The shortcut dispatch for one frame, run by the frame tick. True when the game's own ScreenManager.Update must
+// not run, so it does not handle the key as well. False until kHotkeys is installed.
+bool HandleShortcuts();
 
 // instant_warp.cc
-void InstallInstantWarp();
-void InstantWarpUpdate();
-void CycleInstantWarpConfirmation();
+extern const Feature kInstantWarp;
+void                 CycleInstantWarpConfirmation();
 
-// keybind_badges.cc
+// keybind_badges.cc, installed with the hotkeys.
 void InstallKeybindBadges();
 // Toggles the game's keybind badges. False when the badges are not the mod's, so the key is not used.
 bool ToggleKeybindBadges();
 void HideKeybindBadges();
 
 // loading_screens.cc
-void InstallLoginScreen();
-void InstallTransitionScreen();
-void InstallLoadingTips();
+extern const Feature kLoginScreen;
+extern const Feature kTransitionScreen;
+extern const Feature kLoadingTips;
 
 // missions.cc
-void InstallMissionHud();
-void InstallDailyClaimFilter();
-void MissionsUpdate();
+extern const Feature kMissionHud;
+extern const Feature kDailyClaimFilter;
 
 // officers.cc
-void InstallOfficerSort();
+extern const Feature kOfficerSort;
 
 // screens.cc
 // Presses a button a screen shortcut opened a screen for, once the screen is up. True when one was pressed.
@@ -100,47 +112,45 @@ bool PressAwaitedButton();
 bool ScreenShortcuts();
 
 // shop.cc
-void InstallGiftsAutoOpen();
-void InstallShopLimits();
-void InstallSkipRevealSequence();
-void InstallArtifactExchange();
+extern const Feature kGiftsAutoOpen;
+extern const Feature kShopLimits;
+extern const Feature kSkipRevealSequence;
+extern const Feature kArtifactExchange;
 
 // toasts.cc
-void InstallToasts();
+extern const Feature kToasts;
+
+// tracked_objects.cc
+extern const Feature kObjectTracker;
 
 // ui_scale.cc
-void InstallUiScale();
-void AdjustUiScale(bool up);
-void AdjustUiShipScale(bool up);
-void AdjustUiViewerScale(bool up);
+extern const Feature kUiScale;
+void                 AdjustUiScale(bool up);
+void                 AdjustUiShipScale(bool up);
+void                 AdjustUiViewerScale(bool up);
 
 // window.cc
-void InstallFreeResize();
-void InstallCursor();
+#if _WIN32
+extern const Feature kFreeResize;
+extern const Feature kCursor;
+#endif
 // The monitor's physical-to-logical pixel ratio on Windows; 1 elsewhere. Cached until `refresh`.
 float WindowDpiScale(bool refresh = false);
 
-// sync/
-void InstallSync();
-
-// game/object_tracker.cc
-void InstallObjectTracker();
+// sync/sync.cc
+extern const Feature kSync;
 
 void InstallHavenZoomHooks();
 void InstallHavenHistoryHooks();
 
-void InstallInteriorZoomHooks();
-void InstallChatTitleDisplayHooks();
-void InstallPinnedShipClickHooks();
-void InstallRevealConfirmationHooks();
-void InstallActionQueueRecovery();
-void InstallQueueAddressGuard();
-void InstallThinQueueProtection();
 
-void InstallInteriorZoomHooks();
-void InstallChatTitleDisplayHooks();
-void InstallRevealConfirmationHooks();
-void InstallActionQueueRecovery();
-void InstallQueueAddressGuard();
-void InstallThinQueueProtection();
-void InstallPinnedShipClickHooks();
+
+extern const Feature kInteriorZoom;
+extern const Feature kChatTitles;
+extern const Feature kRevealConfirm;
+extern const Feature kActionQueueRecovery;
+extern const Feature kQueueAddressGuard;
+extern const Feature kThinQueueProtection;
+extern const Feature kPinnedShipClick;
+extern const Feature kDockSelection;
+extern const Feature kAbilityButtons;

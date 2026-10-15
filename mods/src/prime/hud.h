@@ -4,7 +4,6 @@
 // galactic anomaly the viewed system may have.
 
 #include "prime/ui.h"
-#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -15,23 +14,23 @@ struct MissionsHudViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "MissionsHudViewController">;
 
   // The buttons are a mix of Button and GenericButtonWidget fields; only their GameObject matters to the mod.
-  template <il2cpp::Name Field> Component* ButtonField()
-  { return this->template Field<Field, Component*>(); }
+  template <il2cpp::Name Field> unity::Component* ButtonField()
+  { return this->template Field<Field, unity::Component*>(); }
 };
 
 struct FactionInformation : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "FactionInformation">;
 
   // TextLocalizer components, one per system name label.
-  il2cpp::List<Component*>* systemName()
-  { return Field<"_systemName", il2cpp::List<Component*>*>(); }
+  il2cpp::List<unity::Component*>* systemName()
+  { return Field<"_systemName", il2cpp::List<unity::Component*>*>(); }
 };
 
 // Timer data contexts, galactic anomalies and navigation view data are read on their runtime classes: the mod only
 // needs a few members, and these classes have moved between client builds.
 struct TimerDataContext : il2cpp::Object {
-  TimeSpan RemainingTime()
-  { return Get<"RemainingTime", TimeSpan>(); }
+  unity::TimeSpan RemainingTime()
+  { return Get<"RemainingTime", unity::TimeSpan>(); }
 };
 
 // Digit.PrimeServer.Models.GalacticAnomaly
@@ -52,11 +51,11 @@ struct NavigationViewData : il2cpp::Object {
   { return Get<"ViewingAddress", NodeAddress*>(); }
 };
 
-struct HudNavigationViewController : Component {
+struct HudNavigationViewController : unity::Component {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation.UI", "HudNavigationViewController">;
 
-  Component* galacticAnomaliesButtonWidget()
-  { return Field<"_galacticAnomaliesButtonWidget", Component*>(); }
+  unity::Component* galacticAnomaliesButtonWidget()
+  { return Field<"_galacticAnomaliesButtonWidget", unity::Component*>(); }
   FactionInformation* factionInformationHelper()
   { return Field<"_factionInformationHelper", FactionInformation*>(); }
   bool isActiveAndEnabled()
@@ -71,8 +70,8 @@ struct HudNavigationViewController : Component {
 struct HudAllianceAndNewsViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.HUD", "HudAllianceAndNewsViewController">;
 
-  Component* chestPromotion()
-  { return Field<"_chestPromotion", Component*>(); }
+  unity::Component* chestPromotion()
+  { return Field<"_chestPromotion", unity::Component*>(); }
 };
 
 struct GalacticAnomaliesManager : MonoSingleton<GalacticAnomaliesManager> {

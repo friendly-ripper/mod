@@ -3,13 +3,11 @@
 // run on the processing thread, in the order the game received the data.
 
 #include "patches/parts/sync/sync.h"
-
 #include "str_utils.h"
 #include "prime/UserProfileManager.h"
 
 #include <Digit.PrimeServer.Models.pb.h>
 #include <google/protobuf/repeated_field.h>
-
 #include <spdlog/fmt/fmt.h>
 
 #include <algorithm>
@@ -362,7 +360,7 @@ namespace
       auto* manager = UserProfileManager::Instance();
       auto* profile = manager ? manager->GetLocalUserProfile() : nullptr;
       auto* user_id = profile ? profile->UserId() : nullptr;
-      if (!user_id || owner != to_string(user_id))
+      if (!user_id || owner != il2cpp::ToUtf8(user_id))
         return;
     }
     Batch batch(SyncConfig::Type::kHaven);

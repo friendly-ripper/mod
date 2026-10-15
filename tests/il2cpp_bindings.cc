@@ -622,6 +622,9 @@ int main()
   for (auto* item : *second)
     items += item != nullptr;
   Require(items == 3 && (*first)[0] == &list_a.header, "list iteration");
+  Require(first->Method<int32_t()>("get_Count").Pointer() == reinterpret_cast<void*>(&ListA_get_Count),
+          "runtime collection method schema");
+  Require(!first->Method<int32_t(int32_t)>("get_Item"), "runtime collection schema rejects a value result");
 
   // Fully shared generic code is marshalled by the runtime.
   Require(base->Call<"Shared", int32_t>() == 41 && boxed_invocations == 1, "shared generic fallback");
@@ -639,6 +642,15 @@ int main()
           "hook lookup by parameter types");
   Require(!Base::Class::Method("Absent", 0) && ErrorsMentioning("missing method Game.Base.Absent"), "missing hook");
   Require(Base::Class::Method("OnEvent").Name() == "Game.Base.OnEvent", "method name for diagnostics");
+
+  Require(Base::Class::Method<void(bool)>("Select").Pointer() == reinterpret_cast<void*>(&Base_Select_Bool),
+          "typed hook lookup selects the complete instance signature");
+  Require(!Base::Class::Method<int32_t(bool)>("Select"), "typed hook lookup rejects a changed return type");
+  Require(!Base::Class::Method<int32_t(int32_t)>("Twice"), "instance hook lookup rejects a static method");
+  Require(!Base::Class::Method<int32_t()>("Shared"), "typed hook lookup rejects fully shared generic code");
+  Require(Base::Class::HasField<"_count", int32_t>(), "instance field schema accepts the declared type");
+  Require(!Base::Class::HasField<"_count", Other*>(), "instance field schema rejects an incompatible type");
+  Require(!Base::Class::HasField<"s_flag", int32_t>(), "instance field schema rejects a static field");
 
   // Managed strings convert to UTF-8, and compare with ASCII without converting.
   const auto utf16 = [](std::u16string_view text) {

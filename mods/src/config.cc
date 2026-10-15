@@ -2,7 +2,6 @@
 
 #include "file.h"
 #include "patches/shortcuts.h"
-#include "ship_name.h"
 #include "str_utils.h"
 #include "version.h"
 

@@ -26,6 +26,8 @@ namespace il2cpp
 void SetErrorHandler(void (*handler)(std::string_view message));
 // Sends a message through the same handler; for libraries built on this one.
 void Report(std::string_view message);
+// "Namespace.Outer/Inner", for diagnostics.
+std::string ClassName(Il2CppClass* klass);
 
 // Compile-time member name, used as a template argument: Call<"Show">().
 template <size_t N> struct Name {
@@ -346,6 +348,21 @@ template <Name Assembly, Name Namespace, Name TypeName> struct Class {
   static il2cpp::Method Method(std::string_view name, std::initializer_list<std::string_view> params)
   { return detail::FindMethod(Raw(), name, params); }
 
+  // An instance method with its complete C++ signature, for hooks that must reject client ABI drift.
+  template <typename F> static il2cpp::Method Method(std::string_view name)
+  {
+    const auto* method = detail::MethodCall<F>::Resolve(Raw(), name, false);
+    if (method && (method->has_full_generic_sharing_signature || (method->flags & METHOD_ATTRIBUTE_ABSTRACT))) {
+      Report("[IL2CPP] cannot hook shared or abstract method " + ClassName(Raw()) + "." + std::string(name));
+      return {};
+    }
+    return il2cpp::Method(method);
+  }
+
+  // Checks an instance field's schema without reading an object, for hooks that write several related fields.
+  template <Name N, typename T> static bool HasField()
+  { return detail::ResolveField(Raw(), N.View(), detail::SlotOf<T>(), false) != nullptr; }
+
   template <Name N, typename F = void, typename... A> static auto Call(A&&... args)
   {
     using Sig                 = detail::CallOf<F, std::decay_t<A>...>;
@@ -377,6 +394,10 @@ template <Name Assembly, Name Namespace, Name TypeName> struct Class {
 // Base for reference-type bindings. A binding pointer is the managed object itself; bindings add
 // no data members. Receivers must not be null. Missing members return a value-initialized result.
 struct Object : Il2CppObject {
+  // Checks a method on the receiver's runtime class, including inflated collection types.
+  template <typename F, typename Self> il2cpp::Method Method(this Self& self, std::string_view name)
+  { return il2cpp::Method(detail::MethodCall<F>::Resolve(self.klass, name, false)); }
+
   template <Name N, typename T, typename Self> T Get(this Self& self)
   {
     auto* getter = detail::Lookup<Self>(self, [](Il2CppClass* klass) {

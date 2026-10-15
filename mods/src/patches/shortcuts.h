@@ -3,9 +3,8 @@
 // Configurable shortcuts: the actions they trigger, parsing [shortcuts] from the settings file, and
 // matching the parsed key chords against this frame's input.
 
-#include "prime/KeyCode.h"
-
 #include <toml++/toml.h>
+#include <unity/input.h>
 
 #include <array>
 #include <cstdint>
@@ -127,9 +126,9 @@ enum class Action : uint8_t {
 
 // One key with its required modifiers, such as CTRL-SHIFT-F1.
 struct KeyChord {
-  KeyCode key = KeyCode::None;
+  unity::KeyCode key = unity::KeyCode::None;
   // Each group is satisfied by either of its keys: SHIFT is {LeftShift, RightShift}, LSHIFT is LeftShift twice.
-  std::vector<std::array<KeyCode, 2>> modifiers;
+  std::vector<std::array<unity::KeyCode, 2>> modifiers;
   // The upper-cased tokens for display, modifiers first and the key last: {"CTRL", "SHIFT", "F1"}.
   std::vector<std::string> tokens;
 
@@ -161,7 +160,7 @@ bool IsPressed(Action action);
 // Any binding of `action` went down this frame with its modifiers held.
 bool IsDown(Action action);
 // A binding with modifiers matched on `key`, which is still held. Plain bindings on it wait for the release.
-bool Owns(KeyCode key);
+bool Owns(unity::KeyCode key);
 
 // "CTRL-G | F8"
 std::string Describe(Action action);

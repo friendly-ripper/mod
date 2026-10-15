@@ -5,12 +5,11 @@
 #include "patches/patches.h"
 #include "patches/shortcuts.h"
 
-#include "patches/object_tracker.h"
-
 #include "prime/chat.h"
 #include "prime/ui.h"
 
-#include <spud/detour.h>
+#include <il2cpp/hook.h>
+#include <unity/tracker.h>
 
 namespace
 {
@@ -114,6 +113,20 @@ void ChatPreviewController_OnRegionalMessageReceived_Hook(auto original, ChatPre
   if (!Config::Get().ui.disable_veil_chat)
     original(_this, message);
 }
+
+void InstallChat()
+{
+  IL2CPP_HOOK(FullScreenChatViewController::Class::Method("AboutToShow"),
+              FullScreenChatViewController_AboutToShow_Hook);
+  IL2CPP_HOOK(FullScreenChatViewController::Class::Method("OnDidChangeSelectedTab"),
+              FullScreenChatViewController_OnDidChangeSelectedTab_Hook);
+  IL2CPP_HOOK(ChatPreviewController::Class::Method("AboutToShow"), ChatPreviewController_AboutToShow_Hook);
+  IL2CPP_HOOK(ChatPreviewController::Class::Method("OnPanelFocused"), ChatPreviewController_OnPanelFocused_Hook);
+  IL2CPP_HOOK(ChatPreviewController::Class::Method("OnGlobalMessageReceived"),
+              ChatPreviewController_OnGlobalMessageReceived_Hook);
+  IL2CPP_HOOK(ChatPreviewController::Class::Method("OnRegionalMessageReceived"),
+              ChatPreviewController_OnRegionalMessageReceived_Hook);
+}
 } // namespace
 
 void OpenChatShortcut()
@@ -127,7 +140,7 @@ void OpenChatShortcut()
 
   // With side chat already open, the shortcut focuses its input instead.
   if (chat->IsSideChatOpen()) {
-    auto* view  = ObjectFinder<FullScreenChatViewController>::Get();
+    auto* view  = unity::Newest<FullScreenChatViewController>();
     auto* list  = view ? view->messageList() : nullptr;
     auto* input = list ? list->inputField() : nullptr;
     if (input)
@@ -153,18 +166,4 @@ bool ChatChannelShortcuts()
   return false;
 }
 
-void InstallChat()
-{
-  if (auto m = FullScreenChatViewController::Class::Method("AboutToShow"))
-    SPUD_STATIC_DETOUR(m.Pointer(), FullScreenChatViewController_AboutToShow_Hook);
-  if (auto m = FullScreenChatViewController::Class::Method("OnDidChangeSelectedTab"))
-    SPUD_STATIC_DETOUR(m.Pointer(), FullScreenChatViewController_OnDidChangeSelectedTab_Hook);
-  if (auto m = ChatPreviewController::Class::Method("AboutToShow"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ChatPreviewController_AboutToShow_Hook);
-  if (auto m = ChatPreviewController::Class::Method("OnPanelFocused"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ChatPreviewController_OnPanelFocused_Hook);
-  if (auto m = ChatPreviewController::Class::Method("OnGlobalMessageReceived"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ChatPreviewController_OnGlobalMessageReceived_Hook);
-  if (auto m = ChatPreviewController::Class::Method("OnRegionalMessageReceived"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ChatPreviewController_OnRegionalMessageReceived_Hook);
-}
+const Feature kChat{"Chat", &Config::Patches::chatpatches, InstallChat};

@@ -10,12 +10,12 @@
 #include "prime/fleet.h"
 #include "prime/inventory.h"
 #include "prime/navigation.h"
-#include "patches/object_tracker.h"
 #include "prime/officers.h"
 #include "prime/ui.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
+#include <unity/tracker.h>
 
 namespace
 {
@@ -75,9 +75,9 @@ void ShowHaven()
 { PlanetaryBaseManager::ViewOwnHaven(); }
 
 // Presses the button `pick` returns on the first visible, active Controller.
-template <typename Controller> bool PressButton(Button* (*pick)(Controller*))
+template <typename Controller> bool PressButton(unity::Button* (*pick)(Controller*))
 {
-  for (auto* controller : ObjectFinder<Controller>::GetAll()) {
+  for (auto* controller : unity::Instances<Controller>()) {
     auto* button = controller && CanvasController::Shows(controller) && controller->isActiveAndEnabled()
                        ? pick(controller)
                        : nullptr;
@@ -103,15 +103,16 @@ bool PressOfficerSwapButton()
 
 bool PressOfficerPresetsButton()
 {
-  return PressButton<OfficerAssignmentViewController>([](OfficerAssignmentViewController* controller) -> Button* {
-    auto* widget = controller->officerPresetsButton();
-    return widget ? widget->TheButton() : nullptr;
-  });
+  return PressButton<OfficerAssignmentViewController>(
+      [](OfficerAssignmentViewController* controller) -> unity::Button* {
+        auto* widget = controller->officerPresetsButton();
+        return widget ? widget->TheButton() : nullptr;
+      });
 }
 
 void OpenManageShips()
 {
-  auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+  auto* fleet_bar = unity::Newest<FleetBarViewController>();
   if (auto* fleet = fleet_bar ? fleet_bar->SelectedFleet() : nullptr)
     fleet_bar->fleetPanelController()->RequestAction(fleet, ActionType::Manage, 0, ActionBehaviour::Default);
 }
@@ -119,7 +120,7 @@ void OpenManageShips()
 // Opens Manage Ships for the selected fleet, for a button that is only there. False, with a warning, without one.
 bool OpenManageShipsFor(const char* what)
 {
-  auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
+  auto* fleet_bar = unity::Newest<FleetBarViewController>();
   if (!fleet_bar || !fleet_bar->SelectedFleet()) {
     spdlog::warn("[Hotkeys] unable to open Manage Ships for {}", what);
     return false;
@@ -204,7 +205,7 @@ bool StepScreen(bool left)
 
   if (config.ui.arrow_keys_to_select_ship && Hub::CurrentSection() == SectionID::ShipManagement_Details) {
     bool moved = false;
-    for (auto* controller : ObjectFinder<ShipManagementViewController>::GetAll()) {
+    for (auto* controller : unity::Instances<ShipManagementViewController>()) {
       auto* context = controller && controller->isActiveAndEnabled() && CanvasController::Shows(controller)
                           ? controller->Context()
                           : nullptr;
@@ -224,7 +225,7 @@ bool StepScreen(bool left)
 
   if (config.ui.arrow_keys_to_select_ship) {
     bool moved = false;
-    for (auto* widget : ObjectFinder<AssignShipsWidget>::GetAll()) {
+    for (auto* widget : unity::Instances<AssignShipsWidget>()) {
       auto* list = widget && CanvasController::Shows(widget) && widget->isActiveAndEnabled() ? widget->selectableList()
                                                                                              : nullptr;
       if (!list || list->Count() <= 0)
@@ -246,7 +247,7 @@ bool StepScreen(bool left)
   }
 
   bool moved = false;
-  for (auto* controller : ObjectFinder<ArtifactHallDetailsViewController>::GetAll()) {
+  for (auto* controller : unity::Instances<ArtifactHallDetailsViewController>()) {
     if (!controller || !controller->isActiveAndEnabled())
       continue;
     left ? controller->PressLeftArrow() : controller->PressRightArrow();
@@ -255,7 +256,7 @@ bool StepScreen(bool left)
   if (moved)
     return true;
 
-  for (auto* selector : ObjectFinder<ElementSelectorViewController>::GetAll()) {
+  for (auto* selector : unity::Instances<ElementSelectorViewController>()) {
     if (!selector || !selector->isActiveAndEnabled())
       continue;
     left ? selector->PressDecrement() : selector->PressIncrement();
@@ -275,13 +276,13 @@ bool FocusSearchBox()
     return true;
   };
   // InventoryListViewController also covers the officer roster and the other inventory screens.
-  for (auto* controller : ObjectFinder<InventoryListViewController>::GetAll())
+  for (auto* controller : unity::Instances<InventoryListViewController>())
     if (focus(controller))
       return true;
-  for (auto* controller : ObjectFinder<OfficerAssignmentViewController>::GetAll())
+  for (auto* controller : unity::Instances<OfficerAssignmentViewController>())
     if (focus(controller))
       return true;
-  for (auto* widget : ObjectFinder<AssignShipsWidget>::GetAll())
+  for (auto* widget : unity::Instances<AssignShipsWidget>())
     if (focus(widget))
       return true;
   return false;

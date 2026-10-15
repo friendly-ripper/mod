@@ -6,8 +6,8 @@
 
 #include "prime/server.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
 
 namespace
 {
@@ -32,16 +32,13 @@ il2cpp::List<il2cpp::Object*>* BuffService_ExtractBuffsOfType_Hook(auto original
         return nullptr;
   return original(modifier, list);
 }
-} // namespace
 
 void InstallOutOfDockPower()
-{
-  if (auto method = BuffService::Method("IsBuffConditionMet"))
-    SPUD_STATIC_DETOUR(method.Pointer(), BuffService_IsBuffConditionMet_Hook);
-}
+{ IL2CPP_HOOK(BuffService::Method("IsBuffConditionMet"), BuffService_IsBuffConditionMet_Hook); }
 
 void InstallBuffCrashGuard()
-{
-  if (auto method = BuffService::Method("ExtractBuffsOfType"))
-    SPUD_STATIC_DETOUR(method.Pointer(), BuffService_ExtractBuffsOfType_Hook);
-}
+{ IL2CPP_HOOK(BuffService::Method("ExtractBuffsOfType"), BuffService_ExtractBuffsOfType_Hook); }
+} // namespace
+
+const Feature kOutOfDockPower{"OutOfDockPower", &Config::Patches::bufffixhooks, InstallOutOfDockPower};
+const Feature kBuffCrashGuard{"BuffCrashGuard", &Config::Patches::tempcrashfixes, InstallBuffCrashGuard};

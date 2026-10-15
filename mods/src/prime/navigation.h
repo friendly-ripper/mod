@@ -5,7 +5,6 @@
 #include "prime/Hub.h"
 #include "prime/fleet.h"
 #include "prime/ui.h"
-#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 
@@ -32,15 +31,15 @@ struct NavigationLOD : il2cpp::Object {
 struct NavigationPan : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationPan">;
 
-  void MoveCamera(Vector2 delta, bool isMomentum = false)
+  void MoveCamera(unity::Vector2 delta, bool isMomentum = false)
   { Call<"MoveCamera">(delta, isMomentum); }
 
   static bool BlockPan()
   { return Class::Field<"BlockPan", bool>(); }
 
-  Vector2 lastDelta()
-  { return Field<"_lastDelta", Vector2>(); }
-  void SetLastDelta(Vector2 value)
+  unity::Vector2 lastDelta()
+  { return Field<"_lastDelta", unity::Vector2>(); }
+  void SetLastDelta(unity::Vector2 value)
   { SetField<"_lastDelta">(value); }
   float deltaScaler()
   { return Field<"_deltaScaler", float>(); }
@@ -67,8 +66,8 @@ struct MathUtils {
   using Class = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.Client.Core", "MathUtils">;
 
   // The world point under the screen position `mouse`, as seen by `camera`.
-  static Vector3 GetMouseWorldPos(Camera* camera, Vector3 mouse)
-  { return Class::Call<"GetMouseWorldPos", Vector3>(camera, mouse); }
+  static unity::Vector3 GetMouseWorldPos(unity::Camera* camera, unity::Vector3 mouse)
+  { return Class::Call<"GetMouseWorldPos", unity::Vector3>(camera, mouse); }
 };
 
 struct NavigationZoom : il2cpp::Object {
@@ -88,8 +87,8 @@ struct NavigationZoom : il2cpp::Object {
   { return Field<"_depth", NodeDepth>(); }
   ZoomLevels zoomLevel()
   { return Field<"_zoomLevel", ZoomLevels>(); }
-  Camera* sceneCamera()
-  { return Field<"_sceneCamera", Camera*>(); }
+  unity::Camera* sceneCamera()
+  { return Field<"_sceneCamera", unity::Camera*>(); }
 
   void SetZoomtotal(float value)
   { SetField<"_zoomtotal">(value); }
@@ -105,9 +104,9 @@ struct NavigationZoom : il2cpp::Object {
   { return Field<"_viewRadius", float>(); }
   void SetLastZoomDelta(float value)
   { SetField<"_lastZoomDelta">(value); }
-  void SetZoomLocation(Vector2 value)
+  void SetZoomLocation(unity::Vector2 value)
   { SetField<"_zoomLocation">(value); }
-  void SetWorldPoint(Vector3 value)
+  void SetWorldPoint(unity::Vector3 value)
   { SetField<"_worldPoint">(value); }
   void SetFarRatioSystemNormal(float value)
   { SetField<"_farRatioSystemNormal">(value); }
@@ -168,9 +167,10 @@ struct NavigationInteractionUIViewController : il2cpp::Object {
 
   bool IsSetCourseVisible()
   {
-    auto* widget = Field<"_setCourseWidget", SetCourseWidget*>();
+    auto* widget     = Field<"_setCourseWidget", SetCourseWidget*>();
     auto* visibility = widget ? widget->visibilityController() : nullptr;
-    return visibility && (visibility->state() == VisibilityState::Visible || visibility->state() == VisibilityState::Show)
+    return visibility
+           && (visibility->state() == VisibilityState::Visible || visibility->state() == VisibilityState::Show)
            && widget->isActiveAndEnabled();
   }
   void OnSetCourseButtonClick()
@@ -191,8 +191,8 @@ struct PlanetViewUtils : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "PlanetViewUtils">;
 
   // The planet's 2D sprite, a Component. Calling this also runs any detour on get_FlatRenderable.
-  Component* FlatRenderable()
-  { return static_cast<Component*>(Get<"FlatRenderable", Il2CppObject*>()); }
+  unity::Component* FlatRenderable()
+  { return static_cast<unity::Component*>(Get<"FlatRenderable", Il2CppObject*>()); }
 };
 
 struct CoordinateSearchContext : il2cpp::Object {
@@ -221,10 +221,10 @@ struct BookmarksManager : MonoSingleton<BookmarksManager> {
       return;
     }
 
-    auto* zero = il2cpp_string_new("0");
+    auto* zero = il2cpp::NewString("0");
     context->SetDefaultXCoordinate(zero);
     context->SetDefaultYCoordinate(zero);
-    context->SetDefaultSystemInput(il2cpp_string_new(""));
+    context->SetDefaultSystemInput(il2cpp::NewString(""));
     Hub::Sections()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false, true);
   }
 };
@@ -252,4 +252,40 @@ struct CoursePromptPopupViewController : il2cpp::Object {
 
   CoursePromptPopupWidget* PopupWidget()
   { return Field<"_coursePromptPopupWidget", CoursePromptPopupWidget*>(); }
+};
+
+// TouchKit's touch; a held touch reports Stationary, which the pan ignores.
+struct TKTouch : il2cpp::Object {
+  using Class = il2cpp::Class<"TouchKit", "", "TKTouch">;
+
+  unity::TouchPhase phase()
+  { return Field<"phase", unity::TouchPhase>(); }
+  void SetPhase(unity::TouchPhase phase)
+  { SetField<"phase">(phase); }
+};
+
+struct InteriorRadiusConstraint : il2cpp::Object {
+  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "Constraint/FloatData">;
+  bool Enabled()
+  { return Field<"_enabled", bool>(); }
+  float Minimum()
+  { return Field<"_min", float>(); }
+  float Maximum()
+  { return Field<"_max", float>(); }
+  void SetMinimum(float value)
+  { SetField<"_min">(value); }
+  void SetMaximum(float value)
+  { SetField<"_max">(value); }
+};
+
+struct InteriorOrbitConstraint : il2cpp::Object {
+  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "OrbitConstraint">;
+  InteriorRadiusConstraint* Radius()
+  { return Field<"_radius", InteriorRadiusConstraint*>(); }
+};
+
+struct InteriorOrbitProvider : il2cpp::Object {
+  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "AbstractOrbitFrameProvider">;
+  InteriorOrbitConstraint* Constraint()
+  { return Field<"_constraint", InteriorOrbitConstraint*>(); }
 };

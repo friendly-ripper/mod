@@ -1,9 +1,9 @@
 #include "patches/shortcuts.h"
 
-#include "patches/input.h"
 #include "str_utils.h"
 
 #include <spdlog/spdlog.h>
+#include <unity/input.h>
 
 #include <algorithm>
 #include <array>
@@ -15,172 +15,172 @@ namespace
 // has few glyphs, so long names are shortened and the symbols the modifier notation uses are spelled out.
 struct KeyName {
   std::string_view name;
-  KeyCode          key;
+  unity::KeyCode   key;
   std::string_view hint = {};
 };
 
 constexpr KeyName kKeys[] = {
-    {"END", KeyCode::End},
-    {"HOME", KeyCode::Home, "HM"},
-    {"PGDOWN", KeyCode::PageDown, "PD"},
-    {"PGUP", KeyCode::PageUp, "PU"},
-    {"DOWN", KeyCode::DownArrow, "DN"},
-    {"LEFT", KeyCode::LeftArrow, "LT"},
-    {"RIGHT", KeyCode::RightArrow, "RT"},
-    {"UP", KeyCode::UpArrow},
-    {"BACKSPACE", KeyCode::Backspace, "BS"},
-    {"BREAK", KeyCode::Break},
-    {"CAPS", KeyCode::CapsLock},
-    {"CLEAR", KeyCode::Clear},
-    {"DELETE", KeyCode::Delete, "DEL"},
-    {"ESCAPE", KeyCode::Escape, "ESC"},
-    {"HELP", KeyCode::Help},
-    {"INSERT", KeyCode::Insert},
-    {"MENU", KeyCode::Menu},
-    {"PAUSE", KeyCode::Pause},
-    {"PRINT", KeyCode::Print},
-    {"RETURN", KeyCode::Return, "ENT"},
-    {"SCROLL", KeyCode::ScrollLock},
-    {"SYSREQ", KeyCode::SysReq},
-    {"TAB", KeyCode::Tab},
-    {"MOUSE0", KeyCode::Mouse0, "M0"},
-    {"MOUSE1", KeyCode::Mouse1, "M1"},
-    {"MOUSE2", KeyCode::Mouse2, "M2"},
-    {"MOUSE3", KeyCode::Mouse3, "M3"},
-    {"MOUSE4", KeyCode::Mouse4, "M4"},
-    {"MOUSE5", KeyCode::Mouse5, "M5"},
-    {"MOUSE6", KeyCode::Mouse6, "M6"},
-    {"SPACE", KeyCode::Space, "SPC"},
+    {"END", unity::KeyCode::End},
+    {"HOME", unity::KeyCode::Home, "HM"},
+    {"PGDOWN", unity::KeyCode::PageDown, "PD"},
+    {"PGUP", unity::KeyCode::PageUp, "PU"},
+    {"DOWN", unity::KeyCode::DownArrow, "DN"},
+    {"LEFT", unity::KeyCode::LeftArrow, "LT"},
+    {"RIGHT", unity::KeyCode::RightArrow, "RT"},
+    {"UP", unity::KeyCode::UpArrow},
+    {"BACKSPACE", unity::KeyCode::Backspace, "BS"},
+    {"BREAK", unity::KeyCode::Break},
+    {"CAPS", unity::KeyCode::CapsLock},
+    {"CLEAR", unity::KeyCode::Clear},
+    {"DELETE", unity::KeyCode::Delete, "DEL"},
+    {"ESCAPE", unity::KeyCode::Escape, "ESC"},
+    {"HELP", unity::KeyCode::Help},
+    {"INSERT", unity::KeyCode::Insert},
+    {"MENU", unity::KeyCode::Menu},
+    {"PAUSE", unity::KeyCode::Pause},
+    {"PRINT", unity::KeyCode::Print},
+    {"RETURN", unity::KeyCode::Return, "ENT"},
+    {"SCROLL", unity::KeyCode::ScrollLock},
+    {"SYSREQ", unity::KeyCode::SysReq},
+    {"TAB", unity::KeyCode::Tab},
+    {"MOUSE0", unity::KeyCode::Mouse0, "M0"},
+    {"MOUSE1", unity::KeyCode::Mouse1, "M1"},
+    {"MOUSE2", unity::KeyCode::Mouse2, "M2"},
+    {"MOUSE3", unity::KeyCode::Mouse3, "M3"},
+    {"MOUSE4", unity::KeyCode::Mouse4, "M4"},
+    {"MOUSE5", unity::KeyCode::Mouse5, "M5"},
+    {"MOUSE6", unity::KeyCode::Mouse6, "M6"},
+    {"SPACE", unity::KeyCode::Space, "SPC"},
     // Chords are split on '-', so the minus key needs a name.
-    {"MINUS", KeyCode::Minus, "-"},
-    {"_", KeyCode::Underscore},
-    {",", KeyCode::Comma},
-    {";", KeyCode::Semicolon},
-    {":", KeyCode::Colon},
-    {"!", KeyCode::Exclaim, "EXC"},
-    {"?", KeyCode::Question},
-    {".", KeyCode::Period},
-    {"'", KeyCode::Quote},
-    {"(", KeyCode::LeftParen},
-    {")", KeyCode::RightParen},
-    {"[", KeyCode::LeftBracket},
-    {"]", KeyCode::RightBracket},
-    {"{", KeyCode::LeftCurlyBracket},
-    {"}", KeyCode::RightCurlyBracket},
-    {"@", KeyCode::At},
-    {"*", KeyCode::Asterisk},
-    {"/", KeyCode::Slash},
-    {"\"", KeyCode::DoubleQuote},
-    {"\\", KeyCode::Backslash},
-    {"&", KeyCode::Ampersand},
-    {"#", KeyCode::Hash, "HSH"},
-    {"%", KeyCode::Percent},
-    {"`", KeyCode::BackQuote},
-    {"^", KeyCode::Caret, "CAR"},
-    {"+", KeyCode::Plus, "PLS"},
-    {"<", KeyCode::Less},
-    {"=", KeyCode::Equals},
-    {">", KeyCode::Greater},
-    {"~", KeyCode::Tilde},
-    {"$", KeyCode::Dollar},
-    {"0", KeyCode::Alpha0},
-    {"1", KeyCode::Alpha1},
-    {"2", KeyCode::Alpha2},
-    {"3", KeyCode::Alpha3},
-    {"4", KeyCode::Alpha4},
-    {"5", KeyCode::Alpha5},
-    {"6", KeyCode::Alpha6},
-    {"7", KeyCode::Alpha7},
-    {"8", KeyCode::Alpha8},
-    {"9", KeyCode::Alpha9},
-    {"A", KeyCode::A},
-    {"B", KeyCode::B},
-    {"C", KeyCode::C},
-    {"D", KeyCode::D},
-    {"E", KeyCode::E},
-    {"F", KeyCode::F},
-    {"G", KeyCode::G},
-    {"H", KeyCode::H},
-    {"I", KeyCode::I},
-    {"J", KeyCode::J},
-    {"K", KeyCode::K},
-    {"L", KeyCode::L},
-    {"M", KeyCode::M},
-    {"N", KeyCode::N},
-    {"O", KeyCode::O},
-    {"P", KeyCode::P},
-    {"Q", KeyCode::Q},
-    {"R", KeyCode::R},
-    {"S", KeyCode::S},
-    {"T", KeyCode::T},
-    {"U", KeyCode::U},
-    {"V", KeyCode::V},
-    {"W", KeyCode::W},
-    {"X", KeyCode::X},
-    {"Y", KeyCode::Y},
-    {"Z", KeyCode::Z},
-    {"F1", KeyCode::F1},
-    {"F2", KeyCode::F2},
-    {"F3", KeyCode::F3},
-    {"F4", KeyCode::F4},
-    {"F5", KeyCode::F5},
-    {"F6", KeyCode::F6},
-    {"F7", KeyCode::F7},
-    {"F8", KeyCode::F8},
-    {"F9", KeyCode::F9},
-    {"F10", KeyCode::F10},
-    {"F11", KeyCode::F11},
-    {"F12", KeyCode::F12},
-    {"F13", KeyCode::F13},
-    {"F14", KeyCode::F14},
-    {"F15", KeyCode::F15},
-    {"NUMLOCK", KeyCode::Numlock},
-    {"KEY0", KeyCode::Keypad0},
-    {"KEY1", KeyCode::Keypad1},
-    {"KEY2", KeyCode::Keypad2},
-    {"KEY3", KeyCode::Keypad3},
-    {"KEY4", KeyCode::Keypad4},
-    {"KEY5", KeyCode::Keypad5},
-    {"KEY6", KeyCode::Keypad6},
-    {"KEY7", KeyCode::Keypad7},
-    {"KEY8", KeyCode::Keypad8},
-    {"KEY9", KeyCode::Keypad9},
-    {"KEYDIVIDE", KeyCode::KeypadDivide},
-    {"KEYENTER", KeyCode::KeypadEnter},
-    {"KEYEQUAL", KeyCode::KeypadEquals},
-    {"KEYMINUS", KeyCode::KeypadMinus},
-    {"KEYMULTI", KeyCode::KeypadMultiply},
-    {"KEYPERIOD", KeyCode::KeypadPeriod},
-    {"KEYPLUS", KeyCode::KeypadPlus},
+    {"MINUS", unity::KeyCode::Minus, "-"},
+    {"_", unity::KeyCode::Underscore},
+    {",", unity::KeyCode::Comma},
+    {";", unity::KeyCode::Semicolon},
+    {":", unity::KeyCode::Colon},
+    {"!", unity::KeyCode::Exclaim, "EXC"},
+    {"?", unity::KeyCode::Question},
+    {".", unity::KeyCode::Period},
+    {"'", unity::KeyCode::Quote},
+    {"(", unity::KeyCode::LeftParen},
+    {")", unity::KeyCode::RightParen},
+    {"[", unity::KeyCode::LeftBracket},
+    {"]", unity::KeyCode::RightBracket},
+    {"{", unity::KeyCode::LeftCurlyBracket},
+    {"}", unity::KeyCode::RightCurlyBracket},
+    {"@", unity::KeyCode::At},
+    {"*", unity::KeyCode::Asterisk},
+    {"/", unity::KeyCode::Slash},
+    {"\"", unity::KeyCode::DoubleQuote},
+    {"\\", unity::KeyCode::Backslash},
+    {"&", unity::KeyCode::Ampersand},
+    {"#", unity::KeyCode::Hash, "HSH"},
+    {"%", unity::KeyCode::Percent},
+    {"`", unity::KeyCode::BackQuote},
+    {"^", unity::KeyCode::Caret, "CAR"},
+    {"+", unity::KeyCode::Plus, "PLS"},
+    {"<", unity::KeyCode::Less},
+    {"=", unity::KeyCode::Equals},
+    {">", unity::KeyCode::Greater},
+    {"~", unity::KeyCode::Tilde},
+    {"$", unity::KeyCode::Dollar},
+    {"0", unity::KeyCode::Alpha0},
+    {"1", unity::KeyCode::Alpha1},
+    {"2", unity::KeyCode::Alpha2},
+    {"3", unity::KeyCode::Alpha3},
+    {"4", unity::KeyCode::Alpha4},
+    {"5", unity::KeyCode::Alpha5},
+    {"6", unity::KeyCode::Alpha6},
+    {"7", unity::KeyCode::Alpha7},
+    {"8", unity::KeyCode::Alpha8},
+    {"9", unity::KeyCode::Alpha9},
+    {"A", unity::KeyCode::A},
+    {"B", unity::KeyCode::B},
+    {"C", unity::KeyCode::C},
+    {"D", unity::KeyCode::D},
+    {"E", unity::KeyCode::E},
+    {"F", unity::KeyCode::F},
+    {"G", unity::KeyCode::G},
+    {"H", unity::KeyCode::H},
+    {"I", unity::KeyCode::I},
+    {"J", unity::KeyCode::J},
+    {"K", unity::KeyCode::K},
+    {"L", unity::KeyCode::L},
+    {"M", unity::KeyCode::M},
+    {"N", unity::KeyCode::N},
+    {"O", unity::KeyCode::O},
+    {"P", unity::KeyCode::P},
+    {"Q", unity::KeyCode::Q},
+    {"R", unity::KeyCode::R},
+    {"S", unity::KeyCode::S},
+    {"T", unity::KeyCode::T},
+    {"U", unity::KeyCode::U},
+    {"V", unity::KeyCode::V},
+    {"W", unity::KeyCode::W},
+    {"X", unity::KeyCode::X},
+    {"Y", unity::KeyCode::Y},
+    {"Z", unity::KeyCode::Z},
+    {"F1", unity::KeyCode::F1},
+    {"F2", unity::KeyCode::F2},
+    {"F3", unity::KeyCode::F3},
+    {"F4", unity::KeyCode::F4},
+    {"F5", unity::KeyCode::F5},
+    {"F6", unity::KeyCode::F6},
+    {"F7", unity::KeyCode::F7},
+    {"F8", unity::KeyCode::F8},
+    {"F9", unity::KeyCode::F9},
+    {"F10", unity::KeyCode::F10},
+    {"F11", unity::KeyCode::F11},
+    {"F12", unity::KeyCode::F12},
+    {"F13", unity::KeyCode::F13},
+    {"F14", unity::KeyCode::F14},
+    {"F15", unity::KeyCode::F15},
+    {"NUMLOCK", unity::KeyCode::Numlock},
+    {"KEY0", unity::KeyCode::Keypad0},
+    {"KEY1", unity::KeyCode::Keypad1},
+    {"KEY2", unity::KeyCode::Keypad2},
+    {"KEY3", unity::KeyCode::Keypad3},
+    {"KEY4", unity::KeyCode::Keypad4},
+    {"KEY5", unity::KeyCode::Keypad5},
+    {"KEY6", unity::KeyCode::Keypad6},
+    {"KEY7", unity::KeyCode::Keypad7},
+    {"KEY8", unity::KeyCode::Keypad8},
+    {"KEY9", unity::KeyCode::Keypad9},
+    {"KEYDIVIDE", unity::KeyCode::KeypadDivide},
+    {"KEYENTER", unity::KeyCode::KeypadEnter},
+    {"KEYEQUAL", unity::KeyCode::KeypadEquals},
+    {"KEYMINUS", unity::KeyCode::KeypadMinus},
+    {"KEYMULTI", unity::KeyCode::KeypadMultiply},
+    {"KEYPERIOD", unity::KeyCode::KeypadPeriod},
+    {"KEYPLUS", unity::KeyCode::KeypadPlus},
 };
 
 // Modifier names. The unsided ones match either side of the keyboard. Badges use AutoHotkey's ASCII notation.
 struct ModifierName {
-  std::string_view       name;
-  std::array<KeyCode, 2> keys;
-  std::string_view       hint;
+  std::string_view              name;
+  std::array<unity::KeyCode, 2> keys;
+  std::string_view              hint;
 };
 
 constexpr ModifierName kModifiers[] = {
-    {"SHIFT", {KeyCode::LeftShift, KeyCode::RightShift}, "+"},
-    {"CTRL", {KeyCode::LeftControl, KeyCode::RightControl}, "^"},
-    {"ALT", {KeyCode::LeftAlt, KeyCode::RightAlt}, "!"},
-    {"APPLE", {KeyCode::LeftApple, KeyCode::RightApple}, "#"},
-    {"CMD", {KeyCode::LeftCommand, KeyCode::RightCommand}, "#"},
-    {"WIN", {KeyCode::LeftWindows, KeyCode::RightWindows}, "#"},
-    {"LSHIFT", {KeyCode::LeftShift, KeyCode::LeftShift}, "<+"},
-    {"RSHIFT", {KeyCode::RightShift, KeyCode::RightShift}, ">+"},
-    {"LCTRL", {KeyCode::LeftControl, KeyCode::LeftControl}, "<^"},
-    {"RCTRL", {KeyCode::RightControl, KeyCode::RightControl}, ">^"},
-    {"LALT", {KeyCode::LeftAlt, KeyCode::LeftAlt}, "<!"},
-    {"RALT", {KeyCode::RightAlt, KeyCode::RightAlt}, ">!"},
-    {"ALTGR", {KeyCode::AltGr, KeyCode::AltGr}, "!"},
-    {"LAPPLE", {KeyCode::LeftApple, KeyCode::LeftApple}, "<#"},
-    {"LCOM", {KeyCode::LeftCommand, KeyCode::LeftCommand}, "<#"},
-    {"LWIN", {KeyCode::LeftWindows, KeyCode::LeftWindows}, "<#"},
-    {"RAPPLE", {KeyCode::RightApple, KeyCode::RightApple}, ">#"},
-    {"RCOM", {KeyCode::RightCommand, KeyCode::RightCommand}, ">#"},
-    {"RWIN", {KeyCode::RightWindows, KeyCode::RightWindows}, ">#"},
+    {"SHIFT", {unity::KeyCode::LeftShift, unity::KeyCode::RightShift}, "+"},
+    {"CTRL", {unity::KeyCode::LeftControl, unity::KeyCode::RightControl}, "^"},
+    {"ALT", {unity::KeyCode::LeftAlt, unity::KeyCode::RightAlt}, "!"},
+    {"APPLE", {unity::KeyCode::LeftApple, unity::KeyCode::RightApple}, "#"},
+    {"CMD", {unity::KeyCode::LeftCommand, unity::KeyCode::RightCommand}, "#"},
+    {"WIN", {unity::KeyCode::LeftWindows, unity::KeyCode::RightWindows}, "#"},
+    {"LSHIFT", {unity::KeyCode::LeftShift, unity::KeyCode::LeftShift}, "<+"},
+    {"RSHIFT", {unity::KeyCode::RightShift, unity::KeyCode::RightShift}, ">+"},
+    {"LCTRL", {unity::KeyCode::LeftControl, unity::KeyCode::LeftControl}, "<^"},
+    {"RCTRL", {unity::KeyCode::RightControl, unity::KeyCode::RightControl}, ">^"},
+    {"LALT", {unity::KeyCode::LeftAlt, unity::KeyCode::LeftAlt}, "<!"},
+    {"RALT", {unity::KeyCode::RightAlt, unity::KeyCode::RightAlt}, ">!"},
+    {"ALTGR", {unity::KeyCode::AltGr, unity::KeyCode::AltGr}, "!"},
+    {"LAPPLE", {unity::KeyCode::LeftApple, unity::KeyCode::LeftApple}, "<#"},
+    {"LCOM", {unity::KeyCode::LeftCommand, unity::KeyCode::LeftCommand}, "<#"},
+    {"LWIN", {unity::KeyCode::LeftWindows, unity::KeyCode::LeftWindows}, "<#"},
+    {"RAPPLE", {unity::KeyCode::RightApple, unity::KeyCode::RightApple}, ">#"},
+    {"RCOM", {unity::KeyCode::RightCommand, unity::KeyCode::RightCommand}, ">#"},
+    {"RWIN", {unity::KeyCode::RightWindows, unity::KeyCode::RightWindows}, ">#"},
 };
 
 // Settings are only parsed at load, so the tables are searched in order.
@@ -203,26 +203,26 @@ std::vector<KeyChord>& BindingsOf(Action action)
 
 // Keys that completed a binding with modifiers, until released. A plain binding on the same key waits for the
 // release, so letting go of CTRL before PGUP does not turn a held CTRL-PGUP into PGUP.
-std::vector<KeyCode> used_keys;
+std::vector<unity::KeyCode> used_keys;
 
-bool IsUsed(KeyCode key)
+bool IsUsed(unity::KeyCode key)
 {
-  std::erase_if(used_keys, [](KeyCode used) { return !Key::Pressed(used); });
+  std::erase_if(used_keys, [](unity::KeyCode used) { return !unity::Key::Pressed(used); });
   return std::ranges::find(used_keys, key) != used_keys.end();
 }
 
 bool ModifiersHeld(const KeyChord& chord)
 {
   return std::ranges::all_of(chord.modifiers,
-                             [](const auto& group) { return std::ranges::any_of(group, Key::Pressed); });
+                             [](const auto& group) { return std::ranges::any_of(group, unity::Key::Pressed); });
 }
 
-template <bool (*KeyState)(KeyCode)> bool Matches(Action action)
+template <bool (*KeyState)(unity::KeyCode)> bool Matches(Action action)
 {
   for (const auto& chord : BindingsOf(action)) {
-    if (chord.key == KeyCode::None || !KeyState(chord.key))
+    if (chord.key == unity::KeyCode::None || !KeyState(chord.key))
       continue;
-    if (chord.modifiers.empty() ? Key::IsModified() || IsUsed(chord.key) : !ModifiersHeld(chord))
+    if (chord.modifiers.empty() ? unity::Key::IsModified() || IsUsed(chord.key) : !ModifiersHeld(chord))
       continue;
     if (!chord.modifiers.empty() && std::ranges::find(used_keys, chord.key) == used_keys.end())
       used_keys.push_back(chord.key);
@@ -360,7 +360,7 @@ bool BindChords(const Setting& setting, std::string_view key, std::string_view v
 {
   bool bound = false;
   for (const auto& text : StrSplit(value, '|')) {
-    if (auto chord = KeyChord::Parse(text); chord.key != KeyCode::None) {
+    if (auto chord = KeyChord::Parse(text); chord.key != unity::KeyCode::None) {
       Shortcut::Bind(setting.action, std::move(chord));
       bound = true;
     } else {
@@ -436,7 +436,7 @@ KeyChord KeyChord::Parse(std::string_view text)
       key_token = std::move(token);
     }
   }
-  if (chord.key != KeyCode::None)
+  if (chord.key != unity::KeyCode::None)
     chord.tokens.push_back(std::move(key_token));
   return chord;
 }
@@ -457,7 +457,7 @@ std::string KeyChord::Hint() const
   std::string hint;
   for (size_t i = 0; i < tokens.size(); ++i) {
     // The key is always last; everything before it is a modifier.
-    const auto* key      = i + 1 == tokens.size() && this->key != KeyCode::None ? FindKey(tokens[i]) : nullptr;
+    const auto* key      = i + 1 == tokens.size() && this->key != unity::KeyCode::None ? FindKey(tokens[i]) : nullptr;
     const auto* modifier = key ? nullptr : FindModifier(tokens[i]);
     hint += key && !key->hint.empty() ? key->hint : modifier ? modifier->hint : std::string_view(tokens[i]);
   }
@@ -492,19 +492,19 @@ void Clear()
   used_keys.clear();
 }
 
-bool Owns(KeyCode key)
+bool Owns(unity::KeyCode key)
 { return IsUsed(key); }
 
 bool HasBinding(Action action)
 {
-  return std::ranges::any_of(BindingsOf(action), [](const auto& chord) { return chord.key != KeyCode::None; });
+  return std::ranges::any_of(BindingsOf(action), [](const auto& chord) { return chord.key != unity::KeyCode::None; });
 }
 
 bool IsPressed(Action action)
-{ return Matches<Key::Pressed>(action); }
+{ return Matches<unity::Key::Pressed>(action); }
 
 bool IsDown(Action action)
-{ return Matches<Key::Down>(action); }
+{ return Matches<unity::Key::Down>(action); }
 
 std::string Describe(Action action)
 {

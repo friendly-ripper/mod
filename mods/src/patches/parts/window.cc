@@ -7,10 +7,10 @@
 #include "config.h"
 #include "file.h"
 #include "prime/Hub.h"
-#include "prime/unity.h"
+#include <unity/ui.h>
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
 
 #include <Windows.h>
 
@@ -73,7 +73,7 @@ void AspectRatioConstraintHandler_Update_Hook(auto original, void* _this)
 }
 
 // allow_cursor = false: the plain arrow, never clipped to the window.
-void Cursor_SetCursor_Hook(auto original, void* _this, ptrdiff_t texture, Vector2* hotspot, int mode)
+void Cursor_SetCursor_Hook(auto original, void* _this, ptrdiff_t texture, unity::Vector2* hotspot, int mode)
 {
   if (Config::Get().graphics.allow_cursor)
     return original(_this, texture, hotspot, mode);
@@ -93,6 +93,20 @@ intptr_t AspectRatioConstraintHandler_WndProc_Hook(auto original, HWND hWnd, uin
   }
   return original(hWnd, msg, wParam, lParam);
 }
+
+void InstallFreeResize()
+{
+  auto update  = AspectRatioConstraintHandler::Class::Method("Update");
+  auto wndproc = AspectRatioConstraintHandler::Class::Method("WndProc");
+  if (!update || !wndproc)
+    return;
+
+  IL2CPP_HOOK(update, AspectRatioConstraintHandler_Update_Hook);
+  IL2CPP_HOOK(wndproc, AspectRatioConstraintHandler_WndProc_Hook);
+}
+
+void InstallCursor()
+{ IL2CPP_HOOK(unity::Cursor::Method("SetCursor_Injected"), Cursor_SetCursor_Hook); }
 } // namespace
 
 float WindowDpiScale(bool refresh)
@@ -119,21 +133,9 @@ float WindowDpiScale(bool refresh)
   return scale;
 }
 
-void InstallFreeResize()
-{
-  auto update  = AspectRatioConstraintHandler::Class::Method("Update");
-  auto wndproc = AspectRatioConstraintHandler::Class::Method("WndProc");
-  if (!update || !wndproc)
-    return;
-
-  SPUD_STATIC_DETOUR(update.Pointer(), AspectRatioConstraintHandler_Update_Hook);
-  SPUD_STATIC_DETOUR(wndproc.Pointer(), AspectRatioConstraintHandler_WndProc_Hook);
-}
-void InstallCursor()
-{
-  if (auto m = Cursor::Method("SetCursor_Injected"))
-    SPUD_STATIC_DETOUR(m.Pointer(), Cursor_SetCursor_Hook);
-}
+const Feature kFreeResize{"FreeResize", &Config::Patches::freeresizehooks, InstallFreeResize};
+// TODO: allow_cursor is not a test patch; it sits in testpatches only because it always has.
+const Feature kCursor{"Cursor", &Config::Patches::testpatches, InstallCursor};
 #else
 float WindowDpiScale(bool)
 { return 1.0f; }

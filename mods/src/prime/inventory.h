@@ -33,8 +33,8 @@ struct InventoryUsePopupViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Inventories", "InventoryUsePopupViewController">;
 
   // Only artifact bulk conversion uses this button, not the inventory entry button or single exchanges.
-  Component* convertAllButton()
-  { return Field<"_convertAllButton", Component*>(); }
+  unity::Component* convertAllButton()
+  { return Field<"_convertAllButton", unity::Component*>(); }
 };
 
 // Also the base of the officer roster and the other inventory-style lists.

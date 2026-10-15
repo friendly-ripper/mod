@@ -10,8 +10,8 @@
 #include "prime/Hub.h"
 #include "prime/server.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
 
 #include <thread>
 
@@ -65,7 +65,7 @@ namespace
       // may throw.
       const auto* type = realtimeDataPayload->DataType();
       if (type->length == 1 && type->chars[0] == u'0')
-        pending.Push({ProcessRealtimeSlot, to_string(realtimeDataPayload->Data())});
+        pending.Push({ProcessRealtimeSlot, il2cpp::ToUtf8(realtimeDataPayload->Data())});
     }
     return original(_this, centrifugoInfo, realtimeDataPayload, finalPayload);
   }
@@ -86,7 +86,7 @@ namespace
                                      Il2CppString* serverRegion)
   {
     original(_this, gameServerUrl, gatewayServerUrl, sessionId, serverRegion);
-    SetGameServer(to_string(gameServerUrl), to_string(sessionId));
+    SetGameServer(il2cpp::ToUtf8(gameServerUrl), il2cpp::ToUtf8(sessionId));
     // A new login (or a switch of account or server) must not be diffed against the last one's data: the new
     // account gets its first full upload and haven data again, and nothing of the old one is reported gone.
     pending.Push({StartNewSession, {}});
@@ -96,7 +96,7 @@ namespace
                                   bool encryptRequests, Il2CppString* serverRegion)
   {
     original(_this, sessionId, gameVersion, encryptRequests, serverRegion);
-    SetGameVersion(to_string(gameVersion));
+    SetGameVersion(il2cpp::ToUtf8(gameVersion));
   }
 
   void GameServer_SetInstanceIdHeader_Hook(auto original, void* _this, int32_t instanceId)
@@ -104,35 +104,31 @@ namespace
     original(_this, instanceId);
     SetInstanceId(instanceId);
   }
+
+  void Install()
+  {
+    IL2CPP_HOOK(GameServerModelRegistry::Method("ProcessResultInternal"),
+                GameServerModelRegistry_ProcessResultInternal_Hook);
+    IL2CPP_HOOK(PrimeApp::Class::Method("InitPrimeServer"), PrimeApp_InitPrimeServer_Hook);
+
+    // This hook only captures the game version for the X-PRIME-VERSION header, which has a fallback. It can be
+    // turned off for users whose other mods detour the same method: a native and a managed detour on one prologue
+    // corrupt each other and crash at login.
+    if (!Config::Get().patches.game_version)
+      spdlog::info("Sync: skipping GameServer::Initialise hook (patches.game_version = false)");
+    else
+      IL2CPP_HOOK(GameServer::Method("Initialise"), GameServer_Initialise_Hook);
+
+    IL2CPP_HOOK(GameServer::Method("SetInstanceIdHeader"), GameServer_SetInstanceIdHeader_Hook);
+
+    // Each parser overrides ParseFinalPayload, so these are two distinct native methods.
+    IL2CPP_HOOK(SlotAssignRtcParser::Method("ParseFinalPayload"), RtcParser_ParseFinalPayload_Hook);
+    IL2CPP_HOOK(SlotClearRtcParser::Method("ParseFinalPayload"), RtcParser_ParseFinalPayload_Hook);
+
+    StartBattleLogs();
+    std::thread(RunJobs).detach();
+  }
 } // namespace
 } // namespace data_sync
 
-void InstallSync()
-{
-  using namespace data_sync;
-
-  if (auto m = GameServerModelRegistry::Method("ProcessResultInternal"))
-    SPUD_STATIC_DETOUR(m.Pointer(), GameServerModelRegistry_ProcessResultInternal_Hook);
-  if (auto m = PrimeApp::Class::Method("InitPrimeServer"))
-    SPUD_STATIC_DETOUR(m.Pointer(), PrimeApp_InitPrimeServer_Hook);
-
-  // This hook only captures the game version for the X-PRIME-VERSION header, which has a fallback. It can be
-  // turned off for users whose other mods detour the same method: a native and a managed detour on one prologue
-  // corrupt each other and crash at login.
-  if (!Config::Get().patches.game_version)
-    spdlog::info("Sync: skipping GameServer::Initialise hook (patches.game_version = false)");
-  else if (auto m = GameServer::Method("Initialise"))
-    SPUD_STATIC_DETOUR(m.Pointer(), GameServer_Initialise_Hook);
-
-  if (auto m = GameServer::Method("SetInstanceIdHeader"))
-    SPUD_STATIC_DETOUR(m.Pointer(), GameServer_SetInstanceIdHeader_Hook);
-
-  // Each parser overrides ParseFinalPayload, so these are two distinct native methods.
-  if (auto m = SlotAssignRtcParser::Method("ParseFinalPayload"))
-    SPUD_STATIC_DETOUR(m.Pointer(), RtcParser_ParseFinalPayload_Hook);
-  if (auto m = SlotClearRtcParser::Method("ParseFinalPayload"))
-    SPUD_STATIC_DETOUR(m.Pointer(), RtcParser_ParseFinalPayload_Hook);
-
-  StartBattleLogs();
-  std::thread(RunJobs).detach();
-}
+const Feature kSync{"Sync", &Config::Patches::syncpatches, data_sync::Install};

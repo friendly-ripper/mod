@@ -6,10 +6,10 @@
 
 #include "prime/hud.h"
 #include "prime/ui.h"
-#include "prime/unity.h"
 
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
+#include <unity/ui.h>
 
 #include <chrono>
 #include <cstdint>
@@ -19,30 +19,15 @@ namespace
 {
 using Clock = std::chrono::steady_clock;
 
-// Creates an inactive GameObject with a RectTransform under `parent`. `root` keeps it alive until the caller is
-// done building it.
-RectTransform* NewObject(const char* name, Transform* parent, il2cpp::GcHandle& root)
-{
-  auto* object = il2cpp::New<GameObject>(il2cpp_string_new(name));
-  root         = il2cpp::GcHandle::Strong(object);
-  if (!object)
-    return nullptr;
-  object->SetActive(false);
-  auto* transform = object->AddComponent<RectTransform>();
-  if (transform)
-    transform->SetParent(parent, false);
-  return transform;
-}
-
 // The rounded key-hint background next to the native anomaly button, reused for the panel.
-Sprite* NativeBackgroundSprite(HudNavigationViewController* nav)
+unity::Sprite* NativeBackgroundSprite(HudNavigationViewController* nav)
 {
   auto* button     = nav->galacticAnomaliesButtonWidget();
   auto* transform  = button ? button->transform() : nullptr;
   auto* parent     = transform ? transform->parent() : nullptr;
-  auto* background = parent ? parent->Find(il2cpp_string_new("ShortcutKeybindHint/Background")) : nullptr;
+  auto* background = parent ? parent->Find("ShortcutKeybindHint/Background") : nullptr;
   auto* object     = background ? background->gameObject() : nullptr;
-  auto* image      = object ? object->GetComponent<Image>() : nullptr;
+  auto* image      = object ? object->GetComponent<unity::Image>() : nullptr;
   if (!image)
     return nullptr;
   // ImageSelector applies localized artwork through overrideSprite.
@@ -50,16 +35,16 @@ Sprite* NativeBackgroundSprite(HudNavigationViewController* nav)
   return sprite ? sprite : image->sprite();
 }
 
-Image* AddImage(GameObject* object, Color tint, Sprite* sprite)
+unity::Image* AddImage(unity::GameObject* object, unity::Color tint, unity::Sprite* sprite)
 {
-  auto* image = object->AddComponent<Image>();
+  auto* image = object->AddComponent<unity::Image>();
   if (!image)
     return nullptr;
   image->SetColor(tint);
   image->SetRaycastTarget(false);
   if (sprite && sprite->pixelsPerUnit() > 0) {
     image->SetSprite(sprite);
-    image->SetType(Image::Type::Sliced);
+    image->SetType(unity::Image::Type::Sliced);
     image->SetPixelsPerUnitMultiplier(100 / sprite->pixelsPerUnit());
   }
   return image;
@@ -105,7 +90,7 @@ public:
       const auto text = seconds >= 3600
                             ? fmt::format("{}h {:02}m {:02}s", seconds / 3600, seconds / 60 % 60, seconds % 60)
                             : fmt::format("{:02}m {:02}s", seconds / 60, seconds % 60);
-      Label()->SetText(il2cpp_string_new(text.c_str()));
+      Label()->SetText(text);
     }
     Label()->transform()->parent()->gameObject()->SetActive(true);
   }
@@ -115,21 +100,21 @@ private:
   // FindObjectOfType scans every object.
   HudNavigationViewController* Navigation(Clock::time_point now)
   {
-    if (auto* nav = navigation_.Get<HudNavigationViewController>(); UnityObject::Alive(nav))
+    if (auto* nav = navigation_.Get<HudNavigationViewController>(); unity::Alive(nav))
       return nav;
     DestroyPanel();
     if (now < next_find_)
       return nullptr;
     next_find_  = now + std::chrono::seconds(2);
-    navigation_ = il2cpp::GcHandle::Strong(UnityObject::Find<HudNavigationViewController>());
+    navigation_ = il2cpp::GcHandle::Strong(unity::FindObject<HudNavigationViewController>());
     auto* nav   = navigation_.Get<HudNavigationViewController>();
-    return UnityObject::Alive(nav) ? nav : nullptr;
+    return unity::Alive(nav) ? nav : nullptr;
   }
 
-  TMP_Text* Label()
+  unity::TMP_Text* Label()
   {
-    auto* label = label_.Get<TMP_Text>();
-    return UnityObject::Alive(label) ? label : nullptr;
+    auto* label = label_.Get<unity::TMP_Text>();
+    return unity::Alive(label) ? label : nullptr;
   }
 
   void DestroyPanel()
@@ -137,7 +122,7 @@ private:
     if (auto* label = Label()) {
       auto* panel = label->transform()->parent()->gameObject();
       panel->SetActive(false);
-      UnityObject::Destroy(panel);
+      unity::Destroy(panel);
     }
     label_.Reset();
     shown_seconds_ = -1;
@@ -163,44 +148,44 @@ private:
     auto* helper = nav->factionInformationHelper();
     auto* names  = helper ? helper->systemName() : nullptr;
     auto* name   = names && names->Count() > 0 ? (*names)[0] : nullptr;
-    if (!UnityObject::Alive(name))
+    if (!unity::Alive(name))
       return false;
-    auto* drawer    = UnityObject::Find<HudAllianceAndNewsViewController>();
+    auto* drawer    = unity::FindObject<HudAllianceAndNewsViewController>();
     auto* promotion = drawer ? drawer->chestPromotion() : nullptr;
     auto* chest     = promotion ? promotion->transform() : nullptr;
     auto* parent    = chest ? chest->parent() : nullptr;
-    auto* source    = name->gameObject() ? name->gameObject()->GetComponent<TextMeshProUGUI>() : nullptr;
+    auto* source    = name->gameObject() ? name->gameObject()->GetComponent<unity::TextMeshProUGUI>() : nullptr;
     auto* font      = source ? source->font() : nullptr;
     if (!parent || !font)
       return false;
 
     il2cpp::GcHandle panel, fill, text;
-    auto*            panel_rect = NewObject("CommunityMod_AnomalyTimer", parent, panel);
+    auto*            panel_rect = unity::CreateUiObject("CommunityMod_AnomalyTimer", parent, panel);
     if (!panel_rect)
       return false;
     panel_rect->Place({0.5f, 0}, {0.5f, 0}, {0.5f, 1}, {198, 38}, {0, -40});
     auto* rounded = NativeBackgroundSprite(nav);
-    if (!AddImage(panel.Get<GameObject>(), {0.64f, 0.34f, 0.46f, 0.85f}, rounded))
+    if (!AddImage(panel.Get<unity::GameObject>(), {0.64f, 0.34f, 0.46f, 0.85f}, rounded))
       return Abandon(panel);
 
-    auto* fill_rect = NewObject("AnomalyFill", panel_rect, fill);
-    if (!fill_rect || !AddImage(fill.Get<GameObject>(), {0.06f, 0.10f, 0.14f, 0.96f}, rounded))
+    auto* fill_rect = unity::CreateUiObject("AnomalyFill", panel_rect, fill);
+    if (!fill_rect || !AddImage(fill.Get<unity::GameObject>(), {0.06f, 0.10f, 0.14f, 0.96f}, rounded))
       return Abandon(panel);
     fill_rect->Place({0.5f, 0.5f}, {0.5f, 0.5f}, {0.5f, 0.5f}, {194, 34}, {0, 0});
-    fill.Get<GameObject>()->SetActive(true);
+    fill.Get<unity::GameObject>()->SetActive(true);
 
-    auto* text_rect = NewObject("Countdown", panel_rect, text);
-    auto* label     = text_rect ? text.Get<GameObject>()->AddComponent<TextMeshProUGUI>() : nullptr;
+    auto* text_rect = unity::CreateUiObject("Countdown", panel_rect, text);
+    auto* label     = text_rect ? text.Get<unity::GameObject>()->AddComponent<unity::TextMeshProUGUI>() : nullptr;
     if (!label)
       return Abandon(panel);
     text_rect->Place({0.5f, 0.5f}, {0.5f, 0.5f}, {0.5f, 0.5f}, {190, 28}, {0, 0});
     label->SetFont(font);
     label->SetFontSize(22);
-    label->SetAlignment(0x202); // TMP: Center (514).
+    label->SetAlignment(unity::TMP_Text::Alignment::Center);
     label->SetColor({0.95f, 0.83f, 0.89f, 1});
     label->SetRaycastTarget(false);
     label->SetEnableWordWrapping(false);
-    text.Get<GameObject>()->SetActive(true);
+    text.Get<unity::GameObject>()->SetActive(true);
     // The children are owned by the hierarchy once parented; only the label is kept.
     label_ = il2cpp::GcHandle::Strong(label);
     return true;
@@ -208,8 +193,8 @@ private:
 
   static bool Abandon(il2cpp::GcHandle& panel)
   {
-    if (auto* object = panel.Get<GameObject>(); UnityObject::Alive(object))
-      UnityObject::Destroy(object);
+    if (auto* object = panel.Get<unity::GameObject>(); unity::Alive(object))
+      unity::Destroy(object);
     return false;
   }
 
@@ -219,9 +204,7 @@ private:
 };
 
 AnomalyTimer* timer = nullptr;
-} // namespace
-
-void AnomalyTimerUpdate()
+void          AnomalyTimerUpdate()
 {
   if (timer)
     timer->Update();
@@ -230,8 +213,10 @@ void AnomalyTimerUpdate()
 void InstallAnomalyTimer()
 {
   // Never destroyed: GC handles must not be released by static destructors after the runtime is gone.
-  if (InstallFrameTick())
-    timer = new AnomalyTimer;
-  if (timer)
-    spdlog::info("Galactic anomaly countdown enabled (below Help All / Engage / Claim)");
+  timer = new AnomalyTimer;
+  spdlog::info("Galactic anomaly countdown enabled (below Help All / Engage / Claim)");
 }
+} // namespace
+
+const Feature kAnomalyTimer{"AnomalyTimer", &Config::Patches::galacticanomalytimerhooks, InstallAnomalyTimer,
+                            AnomalyTimerUpdate};

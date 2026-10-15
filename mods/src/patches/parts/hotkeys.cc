@@ -1,23 +1,17 @@
-// The mod's frame tick and the order its keyboard shortcuts are handled in. ScreenManager.Update runs once per
-// frame: it runs the features that poll, then the shortcut that was pressed. Returning without calling the game's
-// Update swallows the key, so the game's own handling of it does not run as well.
-//
-// The shortcuts themselves live with their features: screens.cc, fleet_actions.cc, chat.cc, camera.cc. This file
-// keeps the mode switches, restart and quit, Escape, and the shortcuts that change a setting.
+// The order the mod's keyboard shortcuts are handled in, each frame from the frame tick in mod.cc, and the hotkey
+// switches: the mode toggles, restart and quit, Escape, and the shortcuts that change a setting. The other
+// shortcuts live with their features: screens.cc, fleet_actions.cc, chat.cc, camera.cc.
 
 #include "config.h"
 #include "patches/patches.h"
-#include "patches/input.h"
 #include "patches/shortcuts.h"
 
 #include "prime/Hub.h"
 #include "prime/ui.h"
-#include "prime/fleet.h"
-#include "patches/object_tracker.h"
 
-#include <il2cpp/il2cpp.h>
+#include <il2cpp/hook.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/input.h>
 
 #include <chrono>
 
@@ -96,10 +90,10 @@ void SettingShortcuts()
 bool SwallowEscape()
 {
   const auto& config = Config::Get();
-  if (!config.ui.disable_escape_exit || !Key::Pressed(KeyCode::Escape))
+  if (!config.ui.disable_escape_exit || !unity::Key::Pressed(unity::KeyCode::Escape))
     return false;
   // A held key stays swallowed; only distinct presses count towards a double tap.
-  if (config.ui.disable_escape_exit_timer <= 0 || !Key::Down(KeyCode::Escape))
+  if (config.ui.disable_escape_exit_timer <= 0 || !unity::Key::Down(unity::KeyCode::Escape))
     return true;
 
   static Clock::time_point first_press{};
@@ -114,24 +108,9 @@ bool SwallowEscape()
   return false;
 }
 
-void RunFrameUpdates()
-{
-  // Each returns at once when its feature is off. They run in every hotkey mode, including Scopely's and while
-  // hotkeys are toggled off. An exception must not unwind into the game's native frame.
-  for (auto update : {Config::ReloadIfChanged, DockUpdate, MissionsUpdate, AnomalyTimerUpdate, InstantWarpUpdate}) {
-    try {
-      update();
-    } catch (const std::exception& error) {
-      spdlog::warn("[FrameUpdate] update failed: {}", error.what());
-    } catch (...) {
-      spdlog::warn("[FrameUpdate] update failed with an unknown exception");
-    }
-  }
-}
-
 // The shortcut dispatch for one frame. Returns true when the game's Update must not run, so it does not also
 // handle the key.
-bool HandleShortcuts()
+bool DispatchShortcuts()
 {
   auto& config = Config::Get();
 
@@ -157,7 +136,7 @@ bool HandleShortcuts()
     return false;
 
   // Keys typed into a text field (chat, search) are text, not shortcuts.
-  const bool typing = Key::IsInputFocused();
+  const bool typing = unity::Key::IsInputFocused();
   if (!typing && Shortcut::IsDown(Action::kToggleShortcutHints) && ToggleKeybindBadges())
     return true;
 
@@ -181,8 +160,8 @@ bool HandleShortcuts()
 
   // The game only clears a focused text field from its back button; Escape should too.
   const bool in_chat = Hub::IsInChat();
-  if (Key::Pressed(KeyCode::Escape) && (typing || in_chat)) {
-    Key::ClearInputFocus();
+  if (unity::Key::Pressed(unity::KeyCode::Escape) && (typing || in_chat)) {
+    unity::Key::ClearInputFocus();
     return true;
   }
 
@@ -201,130 +180,24 @@ bool HandleShortcuts()
   return FleetActionShortcuts() || SwallowEscape();
 }
 
-void UpdateManageShipDockSelection()
-{
-  static uint64_t last_fleet_id = 0;
-  static auto next_update = std::chrono::steady_clock::time_point{};
-  const auto now = std::chrono::steady_clock::now();
-  if (now < next_update)
-    return;
-  next_update = now + std::chrono::milliseconds(100);
-  auto* sections = Hub::Sections();
-  if (!Config::Get().ui.dock_syncmanagement || !sections
-      || sections->CurrentSection() != SectionID::ShipManagement_Details) {
-    last_fleet_id = 0;
-    return;
-  }
-  for (auto* controller : ObjectFinder<ShipManagementViewController>::GetAll()) {
-    if (!controller || !controller->isActiveAndEnabled())
-      continue;
-    auto* canvas = GetCanvasControllerFromComponent(controller);
-    if (!canvas || !canvas->Visible())
-      continue;
-    auto* context = controller->Context();
-    auto* fleet = context ? context->CurrentFleet() : nullptr;
-    auto* manager = FleetsManager::Instance();
-    if (!fleet || !fleet->HasShip() || !manager || !manager->HasFleetService())
-      continue;
-    const auto index = fleet->Index();
-    if (index < 0)
-      continue;
-    // Exclude unassigned and synthetic fleets; management list order is not dock order.
-    auto* dock_fleet = manager->GetFleetPlayerData(index);
-    if (!dock_fleet || dock_fleet->Id() != fleet->Id())
-      continue;
-    if (last_fleet_id == fleet->Id())
-      return;
-    auto* bar = ObjectFinder<FleetBarViewController>::Get();
-    if (!bar)
-      return;
-    if (!bar->IsIndexSelected(index)) {
-      // Use the bar's selection flow to update both the highlight and fleet panel.
-      bar->RequestSelect(index);
-      if (!bar->IsIndexSelected(index))
-        return; // Retry next update if native selection was blocked.
-      spdlog::debug("[ManageShips] selected dock {} for fleet {}", index + 1, fleet->Id());
-    }
-    last_fleet_id = fleet->Id();
-    return;
-  }
-  last_fleet_id = 0;
-}
-
-void UpdateExpiredAbilityButtons()
-{
-  static auto next_update = std::chrono::steady_clock::time_point{};
-  const auto now = std::chrono::steady_clock::now();
-  if (now < next_update)
-    return;
-  next_update = now + std::chrono::milliseconds(250);
-  auto* bar = ObjectFinder<FleetBarViewController>::Get();
-  auto* controller = bar ? bar->fleetPanelController() : nullptr;
-  auto* fleet = controller ? controller->fleet() : nullptr;
-  if (!fleet || (static_cast<int>(fleet->CurrentState()) & static_cast<int>(FleetState::CanActivateAbility)) == 0)
-    return;
-  auto* manager = ActivatedAbilityManager::Instance();
-  auto* panel = controller->shipActionPanelLocalViewController();
-  auto* canvas = panel ? GetCanvasControllerFromComponent(panel) : nullptr;
-  if (!manager || !canvas || !canvas->Visible() || panel->HasShipAnActiveAbilityWithActiveEffect())
-    return;
-  auto* ids = panel->abilityIDs();
-  auto* buttons = panel->buttons();
-  if (!ids || !buttons)
-    return;
-  for (size_t index = 0; index < ids->size() && index < buttons->size(); ++index) {
-    auto* button = (*buttons)[index];
-    auto* context = button ? button->Context() : nullptr;
-    if (!button || !button->isActiveAndEnabled() || !context || context->Interactable())
-      continue;
-    const auto ability_id = (*ids)[index];
-    auto* timer = panel->GetRemainingCooldown(ability_id);
-    // TimeSpan is an eight-byte value in 100 ns ticks. Repair at -1 second or below.
-    if (timer && timer->RemainingTime().ticks <= -10000000 && manager->CanUseAbility(fleet, ability_id))
-      context->SetInteractable(true);
-  }
-}
-
-void ScreenManager_Update_Hook(auto original, ScreenManager* _this)
-{
-  Key::Poll();
-  RunFrameUpdates();
-  if (hotkeys_installed) {
-    UpdateManageShipDockSelection();
-    UpdateExpiredAbilityButtons();
-  }
-  if (hotkeys_installed && HandleShortcuts())
-    return;
-  original(_this);
-}
-
 // With Scopely hotkeys off, the game never registers its own input actions, so its shortcuts cannot fire.
 void ShortcutsManager_InitializeActions_Hook(auto original, ShortcutsManager* _this)
 {
   if (Config::Get().control.use_scopely_hotkeys)
     original(_this);
 }
-} // namespace
 
-bool InstallFrameTick()
-{
-  static bool installed = false;
-  if (!installed) {
-    if (auto m = ScreenManager::Class::Method("Update")) {
-      SPUD_STATIC_DETOUR(m.Pointer(), ScreenManager_Update_Hook);
-      installed = true;
-    }
-  }
-  return installed;
-}
-
-void InstallHotkeys()
+void Install()
 {
   // The badges only make sense when the game's own input actions are under the mod's control.
-  if (auto m = ShortcutsManager::Class::Method("InitializeActions")) {
-    SPUD_STATIC_DETOUR(m.Pointer(), ShortcutsManager_InitializeActions_Hook);
+  if (IL2CPP_HOOK(ShortcutsManager::Class::Method("InitializeActions"), ShortcutsManager_InitializeActions_Hook))
     InstallKeybindBadges();
-  }
-  hotkeys_installed = InstallFrameTick();
   InstallFleetActions();
+  hotkeys_installed = true;
 }
+} // namespace
+
+bool HandleShortcuts()
+{ return hotkeys_installed && DispatchShortcuts(); }
+
+const Feature kHotkeys{"Hotkeys", &Config::Patches::hotkeyhooks, Install};

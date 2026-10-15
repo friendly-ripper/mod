@@ -5,19 +5,19 @@
 // the game's order.
 
 #include "config.h"
-#include "ship_tile_click.h"
 #include "patches/patches.h"
-#include "patches/input.h"
-#include "ship_name.h"
+#include "ship_tile_click.h"
+#include "str_utils.h"
 
 #include "prime/fleet.h"
-#include "patches/object_tracker.h"
 #include "prime/ui.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/fmt/ranges.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/input.h>
+#include <unity/tracker.h>
 
 #include <algorithm>
 #include <chrono>
@@ -113,7 +113,7 @@ std::chrono::steady_clock::time_point last_click_time{};
 
 void PressAssignButton()
 {
-  for (auto* widget : ObjectFinder<AssignShipsWidget>::GetAll()) {
+  for (auto* widget : unity::Instances<AssignShipsWidget>()) {
     if (!widget || !CanvasController::Shows(widget) || !widget->isActiveAndEnabled())
       continue;
     auto* wrapper = widget->assignButton();
@@ -150,21 +150,79 @@ void DockUpdate()
   if (!Config::Get().ui.double_click_to_assign_ship)
     return;
   // Down, not Pressed: a held Enter must press Assign once, not every frame.
-  if (!Key::Down(KeyCode::Return) && !Key::Down(KeyCode::KeypadEnter))
+  if (!unity::Key::Down(unity::KeyCode::Return) && !unity::Key::Down(unity::KeyCode::KeypadEnter))
     return;
-  if (Key::IsInputFocused())
+  if (unity::Key::IsInputFocused())
     return;
   PressAssignButton();
 }
 
-void InstallPinnedShips()
+namespace
 {
-  if (auto m = ShipManagementViewContext::Class::Method("Sort", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShipManagementViewContext_Sort_Hook);
-}
+void InstallPinnedShips()
+{ IL2CPP_HOOK(ShipManagementViewContext::Class::Method("Sort", 0), ShipManagementViewContext_Sort_Hook); }
 
 void InstallDoubleClickAssign()
+{ ship_tile_click::TryInstallHook(); }
+
+} // namespace
+
+const Feature kPinnedShips{"PinnedShips", &Config::Patches::pinnedshiphooks, InstallPinnedShips};
+const Feature kDoubleClickAssign{"DoubleClickAssign", &Config::Patches::doubleclickassignshiphooks,
+                                 InstallDoubleClickAssign};
+const Feature kAssignOnEnter{"AssignOnEnter", nullptr, nullptr, DockUpdate};
+
+namespace
 {
-  ship_tile_click::TryInstallHook();
-  InstallFrameTick();
+void UpdateManageShipDockSelection()
+{
+  static uint64_t last_fleet_id = 0;
+  static auto     next_update   = std::chrono::steady_clock::time_point{};
+  const auto      now           = std::chrono::steady_clock::now();
+  if (now < next_update)
+    return;
+  next_update    = now + std::chrono::milliseconds(100);
+  auto* sections = Hub::Sections();
+  if (!Config::Get().ui.dock_syncmanagement || !sections
+      || sections->CurrentSection() != SectionID::ShipManagement_Details) {
+    last_fleet_id = 0;
+    return;
+  }
+  for (auto* controller : unity::Instances<ShipManagementViewController>()) {
+    if (!controller || !controller->isActiveAndEnabled())
+      continue;
+    auto* canvas = CanvasController::Of(controller);
+    if (!canvas || !canvas->Visible())
+      continue;
+    auto* context = controller->Context();
+    auto* fleet   = context ? context->CurrentFleet() : nullptr;
+    auto* manager = FleetsManager::Instance();
+    if (!fleet || !fleet->HasShip() || !manager || !manager->HasFleetService())
+      continue;
+    const auto index = fleet->Index();
+    if (index < 0)
+      continue;
+    // Exclude unassigned and synthetic fleets; management list order is not dock order.
+    auto* dock_fleet = manager->GetFleetPlayerData(index);
+    if (!dock_fleet || dock_fleet->Id() != fleet->Id())
+      continue;
+    if (last_fleet_id == fleet->Id())
+      return;
+    auto* bar = unity::Newest<FleetBarViewController>();
+    if (!bar)
+      return;
+    if (!bar->IsIndexSelected(index)) {
+      // Use the bar's selection flow to update both the highlight and fleet panel.
+      bar->RequestSelect(index);
+      if (!bar->IsIndexSelected(index))
+        return; // Retry next update if native selection was blocked.
+      spdlog::debug("[ManageShips] selected dock {} for fleet {}", index + 1, fleet->Id());
+    }
+    last_fleet_id = fleet->Id();
+    return;
+  }
+  last_fleet_id = 0;
 }
+
+} // namespace
+const Feature kDockSelection{"DockSelection", &Config::Patches::hotkeyhooks, nullptr, UpdateManageShipDockSelection};

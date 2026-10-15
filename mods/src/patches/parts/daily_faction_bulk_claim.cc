@@ -8,11 +8,11 @@
 
 #include "prime/hud.h"
 #include "prime/missions.h"
-#include "prime/unity.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
 #include <spdlog/spdlog.h>
-#include <spud/detour.h>
+#include <unity/ui.h>
 
 #include <algorithm>
 #include <string>
@@ -21,9 +21,9 @@ namespace
 {
 // --- Mission HUD buttons ---
 
-using ButtonGetter = Component* (*)(MissionsHudViewController*);
+using ButtonGetter = unity::Component* (*)(MissionsHudViewController*);
 
-template <il2cpp::Name Field> Component* Button(MissionsHudViewController* controller)
+template <il2cpp::Name Field> unity::Component* HudButton(MissionsHudViewController* controller)
 { return controller->ButtonField<Field>(); }
 
 struct ButtonSetting {
@@ -32,9 +32,9 @@ struct ButtonSetting {
 };
 
 constexpr ButtonSetting kButtons[] = {
-    {"q_trials", Button<"_challengesButton">}, {"field_training", Button<"_achievementsButton">},
-    {"outposts", Button<"_outpostsButton">},   {"daily_goals", Button<"_dailyGoalsButton">},
-    {"missions", Button<"_missionsButton">},
+    {"q_trials", HudButton<"_challengesButton">}, {"field_training", HudButton<"_achievementsButton">},
+    {"outposts", HudButton<"_outpostsButton">},   {"daily_goals", HudButton<"_dailyGoalsButton">},
+    {"missions", HudButton<"_missionsButton">},
 };
 
 // The game decides visibility here; the hud_* settings are applied on top every time it does.
@@ -74,7 +74,7 @@ bool Claimed(std::string_view faction)
   return factions.empty() || std::ranges::find(factions, faction) != factions.end();
 }
 
-Transform* FindChild(Transform* root, std::string_view name)
+unity::Transform* FindChild(unity::Transform* root, std::string_view name)
 {
   if (!root)
     return nullptr;
@@ -112,7 +112,7 @@ std::string FactionOf(DailyGoal* daily)
   for (auto* item : *rewards) {
     auto* spec = item ? item->resourceSpec() : nullptr;
     auto* id   = spec ? spec->resourceId() : nullptr;
-    if (auto resource = id ? to_string(id) : std::string(); resource.starts_with(kPrefix))
+    if (auto resource = id ? il2cpp::ToUtf8(id) : std::string(); resource.starts_with(kPrefix))
       return AsciiStrToLower(resource.substr(kPrefix.size()));
   }
   return {};
@@ -158,7 +158,6 @@ void MissionViewController_AboutToHide_Hook(auto original, MissionViewController
     shown_controller = nullptr;
   original(_this);
 }
-} // namespace
 
 void MissionsUpdate()
 {
@@ -178,20 +177,21 @@ void MissionsUpdate()
   toggle_done = toggle->isOn();
 }
 
+void InstallMissionHud()
+{
+  IL2CPP_HOOK(MissionsHudViewController::Class::Method("UpdateButtons", 0),
+              MissionsHudViewController_UpdateButtons_Hook);
+}
+
 void InstallDailyClaimFilter()
 {
   using Controller = MissionViewController::Class;
-  if (auto m = Controller::Method("GetClaimableDailiesList", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), MissionViewController_GetClaimableDailiesList_Hook);
-  if (auto m = Controller::Method("AboutToShow", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), MissionViewController_AboutToShow_Hook);
-  if (auto m = Controller::Method("AboutToHide", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), MissionViewController_AboutToHide_Hook);
-  InstallFrameTick();
+  IL2CPP_HOOK(Controller::Method("GetClaimableDailiesList", 0), MissionViewController_GetClaimableDailiesList_Hook);
+  IL2CPP_HOOK(Controller::Method("AboutToShow", 0), MissionViewController_AboutToShow_Hook);
+  IL2CPP_HOOK(Controller::Method("AboutToHide", 0), MissionViewController_AboutToHide_Hook);
 }
+} // namespace
 
-void InstallMissionHud()
-{
-  if (auto method = MissionsHudViewController::Class::Method("UpdateButtons", 0))
-    SPUD_STATIC_DETOUR(method.Pointer(), MissionsHudViewController_UpdateButtons_Hook);
-}
+const Feature kMissionHud{"MissionHud", &Config::Patches::missionhudtweakshooks, InstallMissionHud};
+const Feature kDailyClaimFilter{"DailyClaimFilter", &Config::Patches::dailyfactionbulkclaimhooks,
+                                InstallDailyClaimFilter, MissionsUpdate};

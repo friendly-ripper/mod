@@ -1,13 +1,14 @@
 // The shop, gift and inventory popups: auto_open_bulk_claim_flyout on the gifts screen, the chest purchase and
-// donation limits, the view button on offers that are cooling down, and always_skip_reveal_sequence.
+// donation limits, the view button on offers that are cooling down, always_skip_reveal_sequence, and
+// disable_exchange_all on the artifact shards popup.
 
 #include "config.h"
 #include "patches/patches.h"
 
 #include "prime/inventory.h"
 
+#include <il2cpp/hook.h>
 #include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
 
 #include <algorithm>
 #include <atomic>
@@ -108,6 +109,21 @@ bool ShopSceneManager_ShouldShowRevealSequence_Hook(auto original, void* _this, 
   return result && !Config::Get().ui.always_skip_reveal_sequence;
 }
 
+void InstallGiftsAutoOpen()
+{
+  using Scroller = ShopListScrollerViewController::Class;
+  IL2CPP_HOOK(Scroller::Method("AboutToShow"), ShopListScrollerViewController_AboutToShow_Hook);
+  IL2CPP_HOOK(Scroller::Method("AboutToHide"), ShopListScrollerViewController_AboutToHide_Hook);
+  IL2CPP_HOOK(Scroller::Method("UpdateDrawer"), ShopListScrollerViewController_UpdateDrawer_Hook);
+}
+
+void InstallShopLimits()
+{
+  IL2CPP_HOOK(InventoryUseRowWidget::Class::Method("SetWidgetData", 0), InventoryUseRowWidget_SetWidgetData_Hook);
+  IL2CPP_HOOK(BundleDataWidget::Class::Method("OnActionButtonPressedCallback"),
+              BundleDataWidget_OnActionButtonPressedCallback_Hook);
+}
+
 // --- Artifact Exchange All ---
 
 // Hides the button after the popup binds. Individual exchanges stay available.
@@ -119,26 +135,6 @@ void InventoryUsePopupViewController_OnDidBindCanvasContext_Hook(auto original, 
   auto* button = _this->convertAllButton();
   if (auto* object = button ? button->gameObject() : nullptr)
     object->SetActive(false);
-}
-} // namespace
-
-void InstallGiftsAutoOpen()
-{
-  using Scroller = ShopListScrollerViewController::Class;
-  if (auto m = Scroller::Method("AboutToShow"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShopListScrollerViewController_AboutToShow_Hook);
-  if (auto m = Scroller::Method("AboutToHide"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShopListScrollerViewController_AboutToHide_Hook);
-  if (auto m = Scroller::Method("UpdateDrawer"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShopListScrollerViewController_UpdateDrawer_Hook);
-}
-
-void InstallShopLimits()
-{
-  if (auto m = InventoryUseRowWidget::Class::Method("SetWidgetData", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), InventoryUseRowWidget_SetWidgetData_Hook);
-  if (auto m = BundleDataWidget::Class::Method("OnActionButtonPressedCallback"))
-    SPUD_STATIC_DETOUR(m.Pointer(), BundleDataWidget_OnActionButtonPressedCallback_Hook);
 }
 
 
@@ -164,19 +160,20 @@ void ShopSceneManager_ShowPlcOfferPopup_Hook(auto original, void* _this)
 }
 
 void InstallSkipRevealSequence()
-{
-  if (auto m = ShopSceneManager::Method("ShouldShowRevealSequence"))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShopSceneManager_ShouldShowRevealSequence_Hook);
-
+{ IL2CPP_HOOK(ShopSceneManager::Method("ShouldShowRevealSequence"), ShopSceneManager_ShouldShowRevealSequence_Hook); 
   using PopupShop = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Shop", "ShopSceneManager">;
-  if (auto m = PopupShop::Method("ShowPlcOfferPopup", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), ShopSceneManager_ShowPlcOfferPopup_Hook);
-  if (auto m = InterstitialViewController::Class::Method("AboutToShow", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), InterstitialViewController_AboutToShow_Hook);
+  IL2CPP_HOOK(PopupShop::Method("ShowPlcOfferPopup", 0), ShopSceneManager_ShowPlcOfferPopup_Hook);
+  IL2CPP_HOOK(InterstitialViewController::Class::Method("AboutToShow", 0), InterstitialViewController_AboutToShow_Hook);
 }
 
 void InstallArtifactExchange()
 {
-  if (auto m = InventoryUsePopupViewController::Class::Method("OnDidBindCanvasContext", 0))
-    SPUD_STATIC_DETOUR(m.Pointer(), InventoryUsePopupViewController_OnDidBindCanvasContext_Hook);
+  IL2CPP_HOOK(InventoryUsePopupViewController::Class::Method("OnDidBindCanvasContext", 0),
+              InventoryUsePopupViewController_OnDidBindCanvasContext_Hook);
 }
+} // namespace
+
+const Feature kGiftsAutoOpen{"GiftsAutoOpen", &Config::Patches::giftsbulkclaimhooks, InstallGiftsAutoOpen};
+const Feature kShopLimits{"ShopLimits", &Config::Patches::miscpatches, InstallShopLimits};
+const Feature kSkipRevealSequence{"SkipRevealSequence", &Config::Patches::tempcrashfixes, InstallSkipRevealSequence};
+const Feature kArtifactExchange{"ArtifactExchange", &Config::Patches::artifactexchangehooks, InstallArtifactExchange};

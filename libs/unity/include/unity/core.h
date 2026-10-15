@@ -20,6 +20,10 @@ struct Vector3 {
   float x, y, z;
 };
 
+struct Quaternion {
+  float x, y, z, w;
+};
+
 struct Color {
   float r, g, b, a;
 };
@@ -62,6 +66,15 @@ struct Transform;
 
 struct GameObject : il2cpp::Object {
   using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "GameObject">;
+
+  static GameObject* Find(std::string_view path)
+  { return Class::Call<"Find", GameObject*>(il2cpp::NewString(path)); }
+
+  template <typename T> il2cpp::Array<T*>* GetComponentsInChildren(bool include_inactive)
+  {
+    auto* type = T::Class::TypeObject();
+    return type ? Call<"GetComponentsInChildren", il2cpp::Array<T*>*>(type, include_inactive) : nullptr;
+  }
 
   // A new, active GameObject with only a Transform, at the scene root.
   static GameObject* Create(std::string_view name)
@@ -184,6 +197,38 @@ struct Camera : il2cpp::Object {
   { Set<"clearFlags">(value); }
   void SetBackgroundColor(Color value)
   { Set<"backgroundColor">(value); }
+};
+
+struct AnimationCurve : il2cpp::Object {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "AnimationCurve">;
+  float Evaluate(float value)
+  { return Call<"Evaluate", float>(value); }
+};
+
+struct Shader : il2cpp::Object {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Shader">;
+  std::string Name()
+  { return il2cpp::ToUtf8(Get<"name", Il2CppString*>()); }
+};
+
+struct Material : il2cpp::Object {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Material">;
+  std::string Name()
+  { return il2cpp::ToUtf8(Get<"name", Il2CppString*>()); }
+  Shader* shader()
+  { return Get<"shader", Shader*>(); }
+  bool HasProperty(Il2CppString* name)
+  { return Call<"HasProperty", bool>(name); }
+  float GetFloat(Il2CppString* name)
+  { return Call<"GetFloat", float>(name); }
+  void SetFloat(Il2CppString* name, float value)
+  { Call<"SetFloat">(name, value); }
+};
+
+struct Renderer : Component {
+  using Class = il2cpp::Class<"UnityEngine.CoreModule", "UnityEngine", "Renderer">;
+  il2cpp::Array<Material*>* SharedMaterials()
+  { return Get<"sharedMaterials", il2cpp::Array<Material*>*>(); }
 };
 
 struct Canvas : il2cpp::Object {

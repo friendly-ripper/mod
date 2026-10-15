@@ -1,19 +1,22 @@
 #include "mod.h"
-#include "patches/patches.h"
 
 #include "config.h"
+#include "patches/patches.h"
 #include "file.h"
 #include "version.h"
 
-#include <il2cpp/il2cpp.h>
-#include <spud/detour.h>
+#include "prime/ui.h"
 
+#include <il2cpp/hook.h>
+#include <il2cpp/il2cpp.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+#include <unity/input.h>
 
 #include <filesystem>
 #include <iterator>
+#include <vector>
 
 #if _WIN32
 #include <Windows.h>
@@ -24,67 +27,117 @@
 #include <mach-o/dyld.h>
 #endif
 
+// The mod's startup: StartMod hooks il2cpp_init, which sets up logging and settings, installs the features, and
+// installs the frame tick that runs them.
+
 namespace
 {
-struct Feature {
-  const char* name;
-  void (*install)();
-  // The [patches] hook group that installs it; null for the few that always install.
-  bool Config::Patches::* group;
-};
-
-// Installed in this order; the log numbers them. Only the [patches] hook groups decide what is installed, so users
-// can avoid clashing with other mods. Feature settings are read inside the hooks, which keeps every feature
-// switchable at runtime; a hook whose feature is off must return early and cheaply.
-constexpr Feature kFeatures[] = {
-    {"interiorzoomhooks", InstallInteriorZoomHooks, &Config::Patches::interiorzoomhooks},
-    {"chattitledisplayhooks", InstallChatTitleDisplayHooks, &Config::Patches::chattitledisplayhooks},
-    {"revealconfirmhooks", InstallRevealConfirmationHooks, &Config::Patches::revealconfirmhooks},
-    {"actionqueuerecoveryhooks", InstallActionQueueRecovery, &Config::Patches::actionqueuerecoveryhooks},
-    {"queueaddressguardhooks", InstallQueueAddressGuard, &Config::Patches::queueaddressguardhooks},
-    {"thinqueueprotectionhooks", InstallThinQueueProtection, &Config::Patches::thinqueueprotectionhooks},
-    {"pinnedshipclicktoggle", InstallPinnedShipClickHooks, &Config::Patches::pinnedshipclicktoggle},
-
-    {"HavenZoom", InstallHavenZoomHooks, &Config::Patches::havenzoomhooks},
-    {"HavenHistory", InstallHavenHistoryHooks, &Config::Patches::havenhistoryhooks},
-    {"UiScale", InstallUiScale, &Config::Patches::uiscalehooks},
-    {"Zoom", InstallZoom, &Config::Patches::zoomhooks},
-    {"FleetLabels", InstallFleetLabels, &Config::Patches::zoomhooks},
-    {"Pan", InstallPan, &Config::Patches::panhooks},
-    {"OutOfDockPower", InstallOutOfDockPower, &Config::Patches::bufffixhooks},
-    {"BuffCrashGuard", InstallBuffCrashGuard, &Config::Patches::tempcrashfixes},
-    {"Toasts", InstallToasts, &Config::Patches::toastbannerhooks},
-    {"Hotkeys", InstallHotkeys, &Config::Patches::hotkeyhooks},
-    {"GiftsAutoOpen", InstallGiftsAutoOpen, &Config::Patches::giftsbulkclaimhooks},
-    {"DailyClaimFilter", InstallDailyClaimFilter, &Config::Patches::dailyfactionbulkclaimhooks},
+// Installed in this order; the log numbers them.
+const Feature kLegacyHavenZoom{"HavenZoom", &Config::Patches::havenzoomhooks, InstallHavenZoomHooks};
+const Feature kLegacyHavenHistory{"HavenHistory", &Config::Patches::havenhistoryhooks, InstallHavenHistoryHooks};
+constexpr const Feature* kFeatures[] = {
+    &kInteriorZoom,
+    &kChatTitles,
+    &kRevealConfirm,
+    &kActionQueueRecovery,
+    &kQueueAddressGuard,
+    &kThinQueueProtection,
+    &kPinnedShipClick,
+    &kDockSelection,
+    &kAbilityButtons,
+    &kLegacyHavenZoom,
+    &kLegacyHavenHistory,
+    &kUiScale,
+    &kZoom,
+    &kFleetLabels,
+    &kPan,
+    &kOutOfDockPower,
+    &kBuffCrashGuard,
+    &kToasts,
+    &kHotkeys,
+    &kGiftsAutoOpen,
+    &kDailyClaimFilter,
 #if _WIN32
-    {"FreeResize", InstallFreeResize, &Config::Patches::freeresizehooks},
-    {"Cursor", InstallCursor, &Config::Patches::testpatches},
+    &kFreeResize,
+    &kCursor,
 #endif
-    {"SkipRevealSequence", InstallSkipRevealSequence, &Config::Patches::tempcrashfixes},
-    {"GameConfigOverrides", InstallGameConfigOverrides, &Config::Patches::testpatches},
-    {"QueueSwitch", InstallQueueSwitch, &Config::Patches::testpatches},
-    {"ShopLimits", InstallShopLimits, &Config::Patches::miscpatches},
-    {"MissionHud", InstallMissionHud, &Config::Patches::missionhudtweakshooks},
-    {"ArtifactExchange", InstallArtifactExchange, &Config::Patches::artifactexchangehooks},
-    {"Chat", InstallChat, &Config::Patches::chatpatches},
-    {"Sync", InstallSync, &Config::Patches::syncpatches},
-    {"ObjectTracker", InstallObjectTracker, &Config::Patches::objecttracker},
-    {"LoginScreen", InstallLoginScreen, &Config::Patches::loadingscreenhooks},
-    {"TransitionScreen", InstallTransitionScreen, &Config::Patches::transitionscreenhooks},
-    {"AnomalyTimer", InstallAnomalyTimer, &Config::Patches::galacticanomalytimerhooks},
-    {"LoadingTips", InstallLoadingTips, &Config::Patches::loadingtiphooks},
-    {"InstantCargo", InstallInstantCargo, &Config::Patches::instantcargocounterhooks},
-    {"CargoFormat", InstallCargoFormat, &Config::Patches::cargoformathooks},
-    {"OfficerSort", InstallOfficerSort, &Config::Patches::officersorthooks},
-    {"PinnedShips", InstallPinnedShips, &Config::Patches::pinnedshiphooks},
-    {"DoubleClickAssign", InstallDoubleClickAssign, &Config::Patches::doubleclickassignshiphooks},
-    {"InstantWarp", InstallInstantWarp, nullptr},
-    {"ForbiddenTechConfirm", InstallForbiddenTechConfirm, &Config::Patches::forbiddentechconfirmhooks},
-    {"Audio", InstallAudio, &Config::Patches::audioeventhooks},
-    // Watching the settings file only needs the frame tick.
-    {"SettingsReload", [] { InstallFrameTick(); }, nullptr},
+    &kSkipRevealSequence,
+    &kGameConfigOverrides,
+    &kQueueSwitch,
+    &kShopLimits,
+    &kMissionHud,
+    &kArtifactExchange,
+    &kChat,
+    &kSync,
+    &kObjectTracker,
+    &kLoginScreen,
+    &kTransitionScreen,
+    &kAnomalyTimer,
+    &kLoadingTips,
+    &kInstantCargo,
+    &kCargoFormat,
+    &kOfficerSort,
+    &kPinnedShips,
+    &kDoubleClickAssign,
+    &kAssignOnEnter,
+    &kInstantWarp,
+    &kForbiddenTechConfirm,
+    &kAudio,
 };
+
+// The per-frame work of the installed features, in install order.
+std::vector<void (*)()> frame_work;
+
+// Runs one piece of frame work. An exception must not unwind into the game's native frame.
+void RunGuarded(void (*work)())
+{
+  try {
+    work();
+  } catch (const std::exception& error) {
+    spdlog::warn("[Frame] update failed: {}", error.what());
+  } catch (...) {
+    spdlog::warn("[Frame] update failed with an unknown exception");
+  }
+}
+
+// ScreenManager.Update is the mod's frame tick. It runs whatever hotkey mode is set: the settings file watch and
+// each feature's frame work first, then the shortcut dispatch. Returning without calling the game's Update swallows
+// the key, so the game's own handling of it does not run as well.
+void ScreenManager_Update_Hook(auto original, ScreenManager* _this)
+{
+  unity::Key::Poll();
+  RunGuarded(Config::ReloadIfChanged);
+  for (auto work : frame_work)
+    RunGuarded(work);
+  if (HandleShortcuts())
+    return;
+  original(_this);
+}
+
+void InstallFeatures(const Config& config)
+{
+  spdlog::info("Initializing code hooks:");
+  for (size_t i = 0; i < std::size(kFeatures); ++i) {
+    const auto& feature = *kFeatures[i];
+    const bool  enabled = !feature.group || config.patches.*feature.group;
+    spdlog::info(" {} {:>2} of {} ({})", enabled ? "+ Patching" : "x Skipping", i + 1, std::size(kFeatures),
+                 feature.name);
+    if (!enabled)
+      continue;
+    try {
+      if (feature.install)
+        feature.install();
+      if (feature.frame)
+        frame_work.push_back(feature.frame);
+    } catch (const std::exception& error) {
+      spdlog::error("{} failed to install: {}", feature.name, error.what());
+    }
+  }
+  // Last, so a feature never sees a frame before it is installed. Without the tick nothing polls, and the settings
+  // file is only read at startup.
+  if (!IL2CPP_HOOK(ScreenManager::Class::Method("Update"), ScreenManager_Update_Hook))
+    spdlog::error("The frame tick is missing: shortcuts, settings reload and per-frame features will not run");
+}
 
 void StartLogging()
 {
@@ -169,20 +222,7 @@ int64_t il2cpp_init_Hook(auto original, const char* domain_name)
   if (!config)
     return result;
 
-  spdlog::info("Initializing code hooks:");
-  for (size_t i = 0; i < std::size(kFeatures); ++i) {
-    const auto& feature = kFeatures[i];
-    const bool  enabled = !feature.group || config->patches.*feature.group;
-    spdlog::info(" {} {:>2} of {} ({})", enabled ? "+ Patching" : "x Skipping", i + 1, std::size(kFeatures),
-                 feature.name);
-    if (!enabled)
-      continue;
-    try {
-      feature.install();
-    } catch (const std::exception& error) {
-      spdlog::error("{} failed to install: {}", feature.name, error.what());
-    }
-  }
+  InstallFeatures(*config);
 
   spdlog::info("");
   if constexpr (VERSION_PATCH)
@@ -227,7 +267,8 @@ void StartMod()
 #else
     auto il2cpp_init = dlsym(assembly, "il2cpp_init");
 #endif
-    SPUD_STATIC_DETOUR(il2cpp_init, il2cpp_init_Hook);
+    if (!IL2CPP_DETOUR(il2cpp_init, il2cpp_init_Hook, "il2cpp_init"))
+      fprintf(stderr, "stfc-community-mod: failed to hook il2cpp_init\n");
   } catch (const std::exception& error) {
     fprintf(stderr, "stfc-community-mod: failed to hook il2cpp_init: %s\n", error.what());
   }

@@ -1,12 +1,11 @@
 // Settings parsing and shortcut matching, run against production code with Unity input replaced by a fake.
-#include "patches/input.h"
 #include "patches/parts/toast_text.h"
 #include "patches/ship_shortcut_hint.h"
 #include "patches/shortcuts.h"
-#include "ship_name.h"
 #include "str_utils.h"
 
 #include <toml++/toml.h>
+#include <unity/input.h>
 
 #include <array>
 #include <cstdlib>
@@ -15,8 +14,8 @@
 
 namespace
 {
-std::array<bool, static_cast<size_t>(KeyCode::Max)> held{};
-int                                                 failures = 0;
+std::array<bool, static_cast<size_t>(unity::KeyCode::Max)> held{};
+int                                                        failures = 0;
 
 void Check(bool condition, const char* what, std::source_location where = std::source_location::current())
 {
@@ -26,7 +25,7 @@ void Check(bool condition, const char* what, std::source_location where = std::s
   }
 }
 
-void Hold(std::initializer_list<KeyCode> keys)
+void Hold(std::initializer_list<unity::KeyCode> keys)
 {
   held.fill(false);
   for (auto key : keys)
@@ -132,14 +131,14 @@ void ShipNames()
 void Chords()
 {
   const auto chord = KeyChord::Parse("ctrl-shift-f1");
-  Check(chord.key == KeyCode::F1, "chord key");
+  Check(chord.key == unity::KeyCode::F1, "chord key");
   Check(chord.modifiers.size() == 2, "chord modifiers");
   Check(chord.Text() == "CTRL-SHIFT-F1", "chord text");
   Check(chord.Hint() == "^+F1", "chord badge");
   Check(KeyChord::Parse("SHIFT-+").Hint() == "+PLS", "plus key as the primary key");
-  Check(KeyChord::Parse("CTRL").key == KeyCode::None, "modifier alone has no key");
-  Check(KeyChord::Parse("NONSENSE").key == KeyCode::None, "unknown key");
-  Check(KeyChord::Parse("CTRL-A-B").key == KeyCode::B && KeyChord::Parse("CTRL-A-B").Text() == "CTRL-B",
+  Check(KeyChord::Parse("CTRL").key == unity::KeyCode::None, "modifier alone has no key");
+  Check(KeyChord::Parse("NONSENSE").key == unity::KeyCode::None, "unknown key");
+  Check(KeyChord::Parse("CTRL-A-B").key == unity::KeyCode::B && KeyChord::Parse("CTRL-A-B").Text() == "CTRL-B",
         "with two keys the last counts, and the text shows it");
   Check(KeyChord::Parse("pgup-lshift").Hint() == "<+PU", "modifiers come first in the badge");
 }
@@ -184,10 +183,11 @@ void Matching()
 {
   Load(""); // defaults: move_down = "S|DOWN", toggle_shortcut_hints = "HOME"
 
-  Hold({KeyCode::DownArrow});
+  Hold({unity::KeyCode::DownArrow});
   Check(Shortcut::IsPressed(Action::kMoveDown), "default movement key");
-  for (auto modifier : {KeyCode::LeftControl, KeyCode::RightShift, KeyCode::LeftAlt, KeyCode::LeftCommand}) {
-    Hold({KeyCode::DownArrow, modifier});
+  for (auto modifier : {unity::KeyCode::LeftControl, unity::KeyCode::RightShift, unity::KeyCode::LeftAlt,
+                        unity::KeyCode::LeftCommand}) {
+    Hold({unity::KeyCode::DownArrow, modifier});
     Check(!Shortcut::IsPressed(Action::kMoveDown), "a modified chord must not trigger the plain binding");
   }
   Hold({});
@@ -195,20 +195,20 @@ void Matching()
 
   // Releasing the modifier first must not turn a held CTRL-PGUP into PGUP.
   Load(""); // ui_scaleup = "PGUP", ui_scaleshipup = "CTRL-PGUP"
-  Hold({KeyCode::LeftControl, KeyCode::PageUp});
+  Hold({unity::KeyCode::LeftControl, unity::KeyCode::PageUp});
   Check(Shortcut::IsPressed(Action::kUiShipScaleUp), "modified chord");
   Check(!Shortcut::IsPressed(Action::kUiScaleUp), "plain chord blocked while modified");
-  Check(Shortcut::Owns(KeyCode::PageUp), "the modified chord owns its key");
-  Hold({KeyCode::PageUp});
+  Check(Shortcut::Owns(unity::KeyCode::PageUp), "the modified chord owns its key");
+  Hold({unity::KeyCode::PageUp});
   Check(!Shortcut::IsPressed(Action::kUiScaleUp), "plain chord waits for the key's release");
   Hold({});
-  Check(!Shortcut::Owns(KeyCode::PageUp), "releasing the key frees it");
-  Hold({KeyCode::PageUp});
+  Check(!Shortcut::Owns(unity::KeyCode::PageUp), "releasing the key frees it");
+  Hold({unity::KeyCode::PageUp});
   Check(Shortcut::IsPressed(Action::kUiScaleUp), "plain chord after a release");
 
   // A modified movement binding keeps moving while its modifier is held.
   Shortcut::Bind(Action::kMoveDown, KeyChord::Parse("CTRL-DOWN"));
-  Hold({KeyCode::LeftControl, KeyCode::DownArrow});
+  Hold({unity::KeyCode::LeftControl, unity::KeyCode::DownArrow});
   Check(Shortcut::IsDown(Action::kMoveDown) && Shortcut::IsDown(Action::kMoveDown),
         "explicit movement chord keeps matching");
   held.fill(false);
@@ -216,21 +216,22 @@ void Matching()
 } // namespace
 
 // The fake Unity input that the shortcut code reads.
-namespace Key
+namespace unity::Key
 {
-bool Pressed(KeyCode key)
+bool Pressed(unity::KeyCode key)
 { return held[static_cast<size_t>(key)]; }
-bool Down(KeyCode key)
+bool Down(unity::KeyCode key)
 { return Pressed(key); }
 bool IsModified()
 {
-  for (auto key : {KeyCode::LeftControl, KeyCode::RightControl, KeyCode::LeftShift, KeyCode::RightShift,
-                   KeyCode::LeftAlt, KeyCode::RightAlt, KeyCode::LeftCommand, KeyCode::RightCommand})
+  for (auto key : {unity::KeyCode::LeftControl, unity::KeyCode::RightControl, unity::KeyCode::LeftShift,
+                   unity::KeyCode::RightShift, unity::KeyCode::LeftAlt, unity::KeyCode::RightAlt,
+                   unity::KeyCode::LeftCommand, unity::KeyCode::RightCommand})
     if (Pressed(key))
       return true;
   return false;
 }
-} // namespace Key
+} // namespace unity::Key
 
 int main()
 {
