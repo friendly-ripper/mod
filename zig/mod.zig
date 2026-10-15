@@ -33,8 +33,8 @@ pub fn unity(ctx: *const Ctx, runtime: Lib, spud: Lib) Lib {
     const include = ctx.dirs(&.{b.path("src/libs/unity/include")});
     const module = ctx.createModule(true);
     for (include) |dir| module.addIncludePath(dir);
-    runtime.linkInto(module);
-    spud.linkInto(module);
+    runtime.includeInto(module);
+    spud.includeInto(module);
     module.addCSourceFiles(.{
         .root = b.path("src/libs/unity"),
         .files = &.{ "src/input.cc", "src/tracker.cc" },
@@ -56,11 +56,13 @@ pub fn add(ctx: *const Ctx, libs: []const Lib) void {
         "-Wno-unused-command-line-argument",
     });
 
+    // The mod compiles against dependency headers only. Libraries link at the final binary, so the mod's
+    // translation units compile alongside its dependencies instead of after them.
     const module = ctx.createModule(true);
     module.addIncludePath(b.path("src/mod"));
     if (ctx.options.moddbg) module.addCMacro("_MODDBG", "1");
     if (ctx.options.use_original_bg) module.addCMacro("_USE_ORIGINAL_BG", "1");
-    for (libs) |lib| lib.linkInto(module);
+    for (libs) |lib| lib.includeInto(module);
     embedImages(ctx, module);
     addModSources(ctx, module, flags);
     const mods = ctx.staticLib("mods", module);
