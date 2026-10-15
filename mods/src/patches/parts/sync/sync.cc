@@ -864,7 +864,7 @@ namespace
 
   void ProcessJson(const std::string& bytes)
   {
-    const auto& options = Config::Get().sync_options;
+    const auto& options = Config::Get().sync.options;
     try {
       const auto result = json::parse(bytes);
       for (const auto& [key, section] : result.items()) {
@@ -948,7 +948,7 @@ namespace
 
     const auto type  = entity_group->Type_();
     const auto route = std::ranges::find(kRoutes, type, &Route::type);
-    if (route == std::end(kRoutes) || (route->option && !(Config::Get().sync_options.*route->option))
+    if (route == std::end(kRoutes) || (route->option && !(Config::Get().sync.options.*route->option))
         || (route->done && *route->done))
       return;
     pending.Push({route->process, std::string(reinterpret_cast<const char*>(group->bytes()->data()),
@@ -973,7 +973,7 @@ namespace
   void* RtcParser_ParseFinalPayload(auto original, void* _this, CentrifugoInfo centrifugoInfo,
                                     RealtimeDataPayload* realtimeDataPayload, void* finalPayload)
   {
-    if (Config::Get().sync_options.slots && realtimeDataPayload && realtimeDataPayload->Target()
+    if (Config::Get().sync.options.slots && realtimeDataPayload && realtimeDataPayload->Target()
         && realtimeDataPayload->DataType() && realtimeDataPayload->Data()) {
       // DataType arrives as a number in a string. This runs inside the game's parser, so nothing here may throw.
       const auto type_string = to_string(realtimeDataPayload->DataType());
@@ -1030,7 +1030,7 @@ void InstallSyncPatches()
   // This hook only captures the game version for the X-PRIME-VERSION header, which has a fallback. It can be
   // turned off for users whose other mods detour the same method: a native and a managed detour on one prologue
   // corrupt each other and crash at login.
-  if (!Config::Get().installGameVersionHook)
+  if (!Config::Get().patches.game_version)
     spdlog::info("Sync: skipping GameServer::Initialise hook (patches.game_version = false)");
   else if (auto m = GameServer::Method("Initialise"))
     SPUD_STATIC_DETOUR(m.Pointer(), GameServer_Initialise);

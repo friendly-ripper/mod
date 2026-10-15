@@ -48,8 +48,8 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
   static auto GetTouchCount  = il2cpp::ResolveICall<int()>("UnityEngine.Input::get_touchCount()");
 
   const auto& config = Config::Get();
-  if (!config.disable_move_keys && config.hotkeys_enabled && !Key::IsDirectionalInputClaimed()) {
-    if (config.use_scopely_hotkeys || !config.installHotkeyHooks) {
+  if (!config.ui.disable_move_keys && config.control.hotkeys_enabled && !Key::IsDirectionalInputClaimed()) {
+    if (config.control.use_scopely_hotkeys || !config.patches.hotkeyhooks) {
       original(_this);
       d = _this->lastDelta();
     } else if (!_this->BlockPan() && !_this->trackingPOI() && !GetMouseButton(0) && GetTouchCount() == 0
@@ -73,8 +73,8 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
   } else if (GetMouseButton(0) || GetTouchCount() > 0) {
     //
   } else {
-    d.x               = d.x * Config::Get().system_pan_momentum_falloff;
-    d.y               = d.y * Config::Get().system_pan_momentum_falloff;
+    d.x               = d.x * Config::Get().graphics.system_pan_momentum_falloff;
+    d.y               = d.y * Config::Get().graphics.system_pan_momentum_falloff;
     _this->SetLastDelta(d);
     _this->MoveCamera(vec2{d.x, d.y}, true);
   }
@@ -88,7 +88,7 @@ void OrbitFrameProvider_UpdateInputData_Hook(auto original, OrbitFrameProvider* 
   original(_this, primary_camera);
 
   auto section_manager = Hub::get_SectionManager();
-  if (!Config::Get().hotkeys_enabled || Config::Get().use_scopely_hotkeys || Config::Get().disable_move_keys
+  if (!Config::Get().control.hotkeys_enabled || Config::Get().control.use_scopely_hotkeys || Config::Get().ui.disable_move_keys
       || !section_manager || section_manager->CurrentSection() != SectionID::Starbase_Exterior || Key::IsInputFocused()) {
     return;
   }
