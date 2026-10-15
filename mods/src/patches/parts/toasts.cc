@@ -390,11 +390,30 @@ void Notify(Toast* toast)
 // Notifies, then reports whether the in-game banner should be shown.
 bool ShowBanner(Toast* toast)
 {
-  if (toast)
-    notification_audio_play(Config::Get().NotificationSoundForToast(static_cast<int>(toast->State())));
-  const auto& ui = Config::Get().ui;
-  if (!toast || (ui.disabled_banner_types.empty() && ui.notify_banner_types.empty()))
+  if (!toast)
     return true;
+  const auto&       audio = Config::Get().audio;
+  NotificationSound sound = NotificationSound::kNone;
+  switch (toast->State()) {
+    case ToastState::Victory:
+      sound = audio.alert_victory;
+      break;
+    case ToastState::Defeat:
+      sound = audio.alert_defeat;
+      break;
+    case ToastState::ArmadaCreated:
+      sound = audio.alert_armada_created;
+      break;
+    case ToastState::ArmadaBattleWon:
+      sound = audio.alert_armada_battle_won;
+      break;
+    case ToastState::ArmadaBattleLost:
+      sound = audio.alert_armada_battle_lost;
+      break;
+    default:
+      break;
+  }
+  PlayNotificationSound(sound);
   Notify(toast);
   const auto& disabled = Config::Get().ui.disabled_banner_types;
   return std::ranges::find(disabled, static_cast<int>(toast->State())) == disabled.end();
