@@ -8,6 +8,7 @@
 // destroyed: static destructors at exit must not free state another thread is still using.
 
 #include "config.h"
+#include "prime/server.h"
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -110,6 +111,17 @@ private:
 // Queues changed records of one category for every target that wants it. `first_sync` marks the first full
 // upload of a category in this session (sent as X-PRIME-SYNC: 2).
 void Queue(SyncConfig::Type type, const nlohmann::json& records, bool first_sync = false);
+
+// records.cc. Processing thread only.
+
+// Turns one server response into records. Its bytes are an entity group's payload.
+using Processor = void (*)(const std::string& bytes);
+// The processor for an entity group kind, or null when the mod does not sync it or no target wants it.
+Processor ProcessorFor(EntityGroup::Kind kind);
+void      ProcessRealtimeSlot(const std::string& bytes);
+// A new login (or a switch of account or server): forgets what was sent, so the new account gets its first full
+// upload and nothing of the old one is reported gone.
+void StartNewSession(const std::string& bytes);
 
 // battlelogs.cc
 
