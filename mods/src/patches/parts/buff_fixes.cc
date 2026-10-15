@@ -1,5 +1,4 @@
 #include "config.h"
-#include "prime_types.h"
 
 #include <il2cpp/il2cpp.h>
 #include <prime/server.h>
