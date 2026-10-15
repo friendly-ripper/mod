@@ -185,16 +185,8 @@ namespace
 struct AppConfig : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.Core", "AppConfig">;
 
-  Il2CppString* PlatformSettingsUrl()
-  { return Get<"PlatformSettingsUrl", Il2CppString*>(); }
   void SetPlatformSettingsUrl(Il2CppString* value)
   { Set<"PlatformSettingsUrl">(value); }
-  Il2CppString* PlatformApiKey()
-  { return Get<"PlatformApiKey", Il2CppString*>(); }
-  void SetPlatformApiKey(Il2CppString* value)
-  { Set<"PlatformApiKey">(value); }
-  Il2CppString* AssetUrlOverride()
-  { return Get<"AssetUrlOverride", Il2CppString*>(); }
   void SetAssetUrlOverride(Il2CppString* value)
   { Set<"AssetUrlOverride">(value); }
 };
@@ -220,18 +212,14 @@ void Cursor_SetCursor(auto original, void* _this, ptrdiff_t texture, Vector2* ho
 void Model_LoadConfigs(auto original, Model* _this)
 {
   original(_this);
-  auto config = _this->appConfig();
-  if (!config) {
+  auto* config = _this->appConfig();
+  if (!config)
     return;
-  }
-
-  if (!Config::Get().game.settings_url.empty()) {
-    config->SetPlatformSettingsUrl(il2cpp_string_new(Config::Get().game.settings_url.c_str()));
-  }
-
-  if (!Config::Get().game.assets_url_override.empty()) {
-    config->SetAssetUrlOverride(il2cpp_string_new(Config::Get().game.assets_url_override.c_str()));
-  }
+  const auto& game = Config::Get().game;
+  if (!game.settings_url.empty())
+    config->SetPlatformSettingsUrl(il2cpp_string_new(game.settings_url.c_str()));
+  if (!game.assets_url_override.empty())
+    config->SetAssetUrlOverride(il2cpp_string_new(game.assets_url_override.c_str()));
 }
 
 bool IsQueueEnabled(auto original, void* _this)
