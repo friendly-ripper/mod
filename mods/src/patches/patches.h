@@ -54,3 +54,11 @@ float WindowDpiScale(bool refresh = false);
 
 void InstallHavenZoomHooks();
 void InstallHavenHistoryHooks();
+
+void InstallInteriorZoomHooks();
+void InstallChatTitleDisplayHooks();
+void InstallPinnedShipClickHooks();
+void InstallRevealConfirmationHooks();
+void InstallActionQueueRecovery();
+void InstallQueueAddressGuard();
+void InstallThinQueueProtection();
