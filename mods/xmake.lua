@@ -89,6 +89,7 @@ do
         add_rules("stfc.cxx.sccache", {override = true})
     end
     add_files("src/**.cc")
+    add_deps("unity", {public = true})
     add_deps("il2cpp", {public = true})
     add_headerfiles("src/**.h")
     add_includedirs("src", { public = true })
