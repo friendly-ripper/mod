@@ -52,7 +52,8 @@ bool ConfirmForbiddenTechUpgrade(Il2CppDelegate* callback)
   if (callback->method->parameters_count != 1)
     return false;
   try {
-    reinterpret_cast<Closure>(callback->method->methodPointer)(callback->target, MessageBoxResult::Confirm, callback->method);
+    reinterpret_cast<Closure>(callback->method->methodPointer)(callback->target, MessageBoxResult::Confirm,
+                                                               callback->method);
   } catch (...) {
     spdlog::warn("ForbiddenTechConfirmation: confirmation callback threw; showing the dialog");
     return false;

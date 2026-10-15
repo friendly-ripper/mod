@@ -26,8 +26,8 @@ public:
   static bool Enabled()
   {
     const auto& config = Config::Get();
-    return config.graphics.zoom_label_player.detail != FleetLabelDetail::Native
-           || config.graphics.zoom_label_non_player.detail != FleetLabelDetail::Native;
+    return config.graphics.zoom_label_player.detail != FleetLabelDetail::kNative
+           || config.graphics.zoom_label_non_player.detail != FleetLabelDetail::kNative;
   }
 
   // The level `lod` should show instead of `native`, or nothing when its fleet is not tracked or labels are native.
@@ -39,11 +39,11 @@ public:
     // Expanded keeps Near where the game would show it, and lifts everything else to Middle.
     const auto expanded = native == ZoomLevels::Near ? ZoomLevels::Near : ZoomLevels::Middle;
     switch (profile->detail) {
-      case FleetLabelDetail::Expanded:
+      case FleetLabelDetail::kExpanded:
         return expanded;
-      case FleetLabelDetail::Compact:
+      case FleetLabelDetail::kCompact:
         return ZoomLevels::Far;
-      case FleetLabelDetail::Threshold:
+      case FleetLabelDetail::kThreshold:
         if (!zoom_known_)
           return native;
         return ExpandedAt(profile->zoom_threshold) ? expanded : ZoomLevels::Far;
@@ -124,8 +124,8 @@ private:
   static bool UsesThreshold()
   {
     const auto& config = Config::Get();
-    return config.graphics.zoom_label_player.detail == FleetLabelDetail::Threshold
-           || config.graphics.zoom_label_non_player.detail == FleetLabelDetail::Threshold;
+    return config.graphics.zoom_label_player.detail == FleetLabelDetail::kThreshold
+           || config.graphics.zoom_label_non_player.detail == FleetLabelDetail::kThreshold;
   }
 
   // Labels expand when zoomed in at least as far as the threshold. 0 never expands, 1 always does.
@@ -163,9 +163,9 @@ private:
   void UpdateThreshold()
   {
     const auto& config     = Config::Get();
-    const bool  player     = config.graphics.zoom_label_player.detail == FleetLabelDetail::Threshold
+    const bool  player     = config.graphics.zoom_label_player.detail == FleetLabelDetail::kThreshold
                              && ExpandedAt(config.graphics.zoom_label_player.zoom_threshold);
-    const bool  non_player = config.graphics.zoom_label_non_player.detail == FleetLabelDetail::Threshold
+    const bool  non_player = config.graphics.zoom_label_non_player.detail == FleetLabelDetail::kThreshold
                              && ExpandedAt(config.graphics.zoom_label_non_player.zoom_threshold);
     if (threshold_known_ && player == player_expanded_ && non_player == non_player_expanded_)
       return;

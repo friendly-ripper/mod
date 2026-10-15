@@ -16,22 +16,22 @@
 // Which categories of game data are uploaded, globally ([sync]) or for one target ([sync.targets.<name>]).
 struct SyncConfig {
   enum class Type {
-    AwayAssignments,
-    Battles,
-    Buffs,
-    Buildings,
-    EmeraldChain,
-    Haven,
-    Inventory,
-    Jobs,
-    Missions,
-    Officer,
-    Research,
-    Resources,
-    Ships,
-    Slots,
-    Tech,
-    Traits
+    kAwayAssignments,
+    kBattles,
+    kBuffs,
+    kBuildings,
+    kEmeraldChain,
+    kHaven,
+    kInventory,
+    kJobs,
+    kMissions,
+    kOfficer,
+    kResearch,
+    kResources,
+    kShips,
+    kSlots,
+    kTech,
+    kTraits
   };
 
   struct Option {
@@ -63,23 +63,23 @@ struct SyncConfig {
 };
 
 constexpr std::array SyncOptions{
-    SyncConfig::Option{SyncConfig::Type::AwayAssignments, "away_assignment", "away_assignments",
+    SyncConfig::Option{SyncConfig::Type::kAwayAssignments, "away_assignment", "away_assignments",
                        &SyncConfig::away_assignments},
-    SyncConfig::Option{SyncConfig::Type::Battles, "battlelog", "battlelogs", &SyncConfig::battlelogs},
-    SyncConfig::Option{SyncConfig::Type::Buffs, "buff", "buffs", &SyncConfig::buffs},
-    SyncConfig::Option{SyncConfig::Type::Buildings, "module", "buildings", &SyncConfig::buildings},
-    SyncConfig::Option{SyncConfig::Type::EmeraldChain, "emerald_chain", "buffs", &SyncConfig::buffs},
-    SyncConfig::Option{SyncConfig::Type::Haven, "haven", "haven", &SyncConfig::haven},
-    SyncConfig::Option{SyncConfig::Type::Inventory, "inventory", "inventory", &SyncConfig::inventory},
-    SyncConfig::Option{SyncConfig::Type::Jobs, "job", "jobs", &SyncConfig::jobs},
-    SyncConfig::Option{SyncConfig::Type::Missions, "mission", "missions", &SyncConfig::missions},
-    SyncConfig::Option{SyncConfig::Type::Officer, "officer", "officers", &SyncConfig::officers},
-    SyncConfig::Option{SyncConfig::Type::Research, "research", "research", &SyncConfig::research},
-    SyncConfig::Option{SyncConfig::Type::Resources, "resource", "resources", &SyncConfig::resources},
-    SyncConfig::Option{SyncConfig::Type::Ships, "ship", "ships", &SyncConfig::ships},
-    SyncConfig::Option{SyncConfig::Type::Slots, "slot", "slots", &SyncConfig::slots},
-    SyncConfig::Option{SyncConfig::Type::Tech, "ft", "tech", &SyncConfig::tech},
-    SyncConfig::Option{SyncConfig::Type::Traits, "trait", "traits", &SyncConfig::traits},
+    SyncConfig::Option{SyncConfig::Type::kBattles, "battlelog", "battlelogs", &SyncConfig::battlelogs},
+    SyncConfig::Option{SyncConfig::Type::kBuffs, "buff", "buffs", &SyncConfig::buffs},
+    SyncConfig::Option{SyncConfig::Type::kBuildings, "module", "buildings", &SyncConfig::buildings},
+    SyncConfig::Option{SyncConfig::Type::kEmeraldChain, "emerald_chain", "buffs", &SyncConfig::buffs},
+    SyncConfig::Option{SyncConfig::Type::kHaven, "haven", "haven", &SyncConfig::haven},
+    SyncConfig::Option{SyncConfig::Type::kInventory, "inventory", "inventory", &SyncConfig::inventory},
+    SyncConfig::Option{SyncConfig::Type::kJobs, "job", "jobs", &SyncConfig::jobs},
+    SyncConfig::Option{SyncConfig::Type::kMissions, "mission", "missions", &SyncConfig::missions},
+    SyncConfig::Option{SyncConfig::Type::kOfficer, "officer", "officers", &SyncConfig::officers},
+    SyncConfig::Option{SyncConfig::Type::kResearch, "research", "research", &SyncConfig::research},
+    SyncConfig::Option{SyncConfig::Type::kResources, "resource", "resources", &SyncConfig::resources},
+    SyncConfig::Option{SyncConfig::Type::kShips, "ship", "ships", &SyncConfig::ships},
+    SyncConfig::Option{SyncConfig::Type::kSlots, "slot", "slots", &SyncConfig::slots},
+    SyncConfig::Option{SyncConfig::Type::kTech, "ft", "tech", &SyncConfig::tech},
+    SyncConfig::Option{SyncConfig::Type::kTraits, "trait", "traits", &SyncConfig::traits},
 };
 
 constexpr std::string to_string(const SyncConfig::Type type)
@@ -102,26 +102,26 @@ struct SyncTargetConfig : SyncConfig {
 };
 
 enum class MissionHudVisibility {
-  Auto,
-  Always,
-  Never,
+  kAuto,
+  kAlways,
+  kNever,
 };
 
 enum class InstantWarpConfirmation {
-  None,
-  Warp,
-  Jump,
+  kNone,
+  kWarp,
+  kJump,
 };
 
 enum class FleetLabelDetail {
-  Native,
-  Expanded,
-  Compact,
-  Threshold,
+  kNative,
+  kExpanded,
+  kCompact,
+  kThreshold,
 };
 
 struct FleetLabelProfile {
-  FleetLabelDetail detail         = FleetLabelDetail::Native;
+  FleetLabelDetail detail         = FleetLabelDetail::kNative;
   float            zoom_threshold = 0.5f;
 };
 
@@ -284,7 +284,7 @@ public:
     std::vector<std::string> daily_bulk_claim_factions{"federation", "klingon", "romulan"};
     bool                     daily_bulk_claim_toggle_default_on = false;
 
-    InstantWarpConfirmation               auto_confirm_instant_warp = InstantWarpConfirmation::None;
+    InstantWarpConfirmation               auto_confirm_instant_warp = InstantWarpConfirmation::kNone;
     ShipFilter                            instant_warp_auto_jump;
     ShipFilter                            instant_warp_auto_warp;
     ShipFilter                            instant_warp_always_ask;

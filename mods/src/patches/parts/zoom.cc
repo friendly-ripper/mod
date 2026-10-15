@@ -48,16 +48,11 @@ struct Preset {
 };
 
 constexpr Preset kPresets[] = {
-    {Action::SetZoomPreset1, Action::ZoomPreset1, &Config::Graphics::system_zoom_preset_1,
-     "System Preset 1"},
-    {Action::SetZoomPreset2, Action::ZoomPreset2, &Config::Graphics::system_zoom_preset_2,
-     "System Preset 2"},
-    {Action::SetZoomPreset3, Action::ZoomPreset3, &Config::Graphics::system_zoom_preset_3,
-     "System Preset 3"},
-    {Action::SetZoomPreset4, Action::ZoomPreset4, &Config::Graphics::system_zoom_preset_4,
-     "System Preset 4"},
-    {Action::SetZoomPreset5, Action::ZoomPreset5, &Config::Graphics::system_zoom_preset_5,
-     "System Preset 5"},
+    {Action::kSetZoomPreset1, Action::kZoomPreset1, &Config::Graphics::system_zoom_preset_1, "System Preset 1"},
+    {Action::kSetZoomPreset2, Action::kZoomPreset2, &Config::Graphics::system_zoom_preset_2, "System Preset 2"},
+    {Action::kSetZoomPreset3, Action::kZoomPreset3, &Config::Graphics::system_zoom_preset_3, "System Preset 3"},
+    {Action::kSetZoomPreset4, Action::kZoomPreset4, &Config::Graphics::system_zoom_preset_4, "System Preset 4"},
+    {Action::kSetZoomPreset5, Action::kZoomPreset5, &Config::Graphics::system_zoom_preset_5, "System Preset 5"},
 };
 
 // Widens the system view's zoom range to the configured maximum and pushes the far clip plane out with it.
@@ -108,8 +103,8 @@ void ZoomAtMouse(NavigationZoom* zoom, float value, bool absolute)
 // Returns false when a preset was stored, which skips the game's update for that frame.
 bool KeyboardZoom(NavigationZoom* zoom)
 {
-  auto&       config       = Config::Get();
-  const bool  shortcuts    = config.control.hotkeys_enabled && !config.control.use_scopely_hotkeys;
+  auto&      config    = Config::Get();
+  const bool shortcuts = config.control.hotkeys_enabled && !config.control.use_scopely_hotkeys;
 
   float target      = 0.0f;
   bool  from_preset = false;
@@ -120,7 +115,7 @@ bool KeyboardZoom(NavigationZoom* zoom)
         return false;
       }
     }
-    if (Shortcut::IsDown(Action::SetZoomDefault)) {
+    if (Shortcut::IsDown(Action::kSetZoomDefault)) {
       StorePreset("System Default", config.graphics.default_system_zoom, zoom);
       return false;
     }
@@ -132,11 +127,11 @@ bool KeyboardZoom(NavigationZoom* zoom)
       }
     }
     if (config.control.hotkeys_extended) {
-      if (Shortcut::IsDown(Action::ZoomReset))
+      if (Shortcut::IsDown(Action::kZoomReset))
         target = config.graphics.default_system_zoom;
-      else if (Shortcut::IsDown(Action::ZoomMin))
+      else if (Shortcut::IsDown(Action::kZoomMin))
         target = config.graphics.zoom;
-      else if (Shortcut::IsDown(Action::ZoomMax))
+      else if (Shortcut::IsDown(Action::kZoomMax))
         target = 100.0f;
     }
   }
@@ -144,9 +139,9 @@ bool KeyboardZoom(NavigationZoom* zoom)
     ZoomAtMouse(zoom, target, true);
   } else {
     const float step = config.graphics.keyboard_zoom_speed * Time::deltaTime();
-    if (shortcuts && Shortcut::IsPressed(Action::ZoomIn))
+    if (shortcuts && Shortcut::IsPressed(Action::kZoomIn))
       ZoomAtMouse(zoom, step, false);
-    else if (shortcuts && Shortcut::IsPressed(Action::ZoomOut))
+    else if (shortcuts && Shortcut::IsPressed(Action::kZoomOut))
       ZoomAtMouse(zoom, -step, false);
   }
 
@@ -204,7 +199,7 @@ void ScaleFlatRenderable(Component* renderable)
   constexpr size_t                             kRemembered = 256;
   static std::unordered_map<Transform*, float> scaled;
   const float                                  factor = Config::Get().graphics.fr_scale;
-  auto*                                        transform = renderable && factor > 0.0f && factor != 1.0f ? renderable->transform() : nullptr;
+  auto* transform = renderable && factor > 0.0f && factor != 1.0f ? renderable->transform() : nullptr;
   if (!transform)
     return;
   const auto scale = transform->localScale();
@@ -276,10 +271,8 @@ bool NavigationPan_LateUpdate_Hook(auto original, NavigationPan* _this)
   bool       by_keys = false;
   if (keyboard && !blocked && !pointer && KeyboardPanAllowed()) {
     // Opposite bindings cancel; normalize diagonals like the native 2D composite.
-    const float x =
-        float(Shortcut::IsPressed(Action::MoveRight)) - float(Shortcut::IsPressed(Action::MoveLeft));
-    const float y =
-        float(Shortcut::IsPressed(Action::MoveUp)) - float(Shortcut::IsPressed(Action::MoveDown));
+    const float x = float(Shortcut::IsPressed(Action::kMoveRight)) - float(Shortcut::IsPressed(Action::kMoveLeft));
+    const float y = float(Shortcut::IsPressed(Action::kMoveUp)) - float(Shortcut::IsPressed(Action::kMoveDown));
     if (const float length = std::sqrt(x * x + y * y); length > 0.0f) {
       d.x     = -x / length * _this->keyboardDeltaScaler();
       d.y     = -y / length * _this->keyboardDeltaScaler();
@@ -314,9 +307,9 @@ void OrbitFrameProvider_UpdateInputData_Hook(auto original, OrbitFrameProvider* 
 
   constexpr float kDegreesPerSecond = 45.0f;
   const float     step              = kDegreesPerSecond * Time::deltaTime();
-  if (Shortcut::IsPressed(Action::MoveLeft))
+  if (Shortcut::IsPressed(Action::kMoveLeft))
     _this->SetRotationAngleDelta(_this->RotationAngleDelta() - step);
-  if (Shortcut::IsPressed(Action::MoveRight))
+  if (Shortcut::IsPressed(Action::kMoveRight))
     _this->SetRotationAngleDelta(_this->RotationAngleDelta() + step);
 }
 

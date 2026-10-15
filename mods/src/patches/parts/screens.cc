@@ -78,8 +78,9 @@ void ShowHaven()
 template <typename Controller> bool PressButton(Button* (*pick)(Controller*))
 {
   for (auto* controller : ObjectFinder<Controller>::GetAll()) {
-    auto* button =
-        controller && CanvasController::Shows(controller) && controller->isActiveAndEnabled() ? pick(controller) : nullptr;
+    auto* button = controller && CanvasController::Shows(controller) && controller->isActiveAndEnabled()
+                       ? pick(controller)
+                       : nullptr;
     if (button) {
       button->Press();
       return true;
@@ -157,42 +158,42 @@ struct ScreenShortcut {
 
 // Checked in order; the first pressed one runs.
 constexpr ScreenShortcut kScreens[] = {
-    {Action::ShowQTrials, Goto<SectionID::ChallengeSelection>},
-    {Action::ShowBookmarks, ShowBookmarks},
-    {Action::ShowLookup, ShowCoordinateSearch},
-    {Action::ShowRefinery, Goto<SectionID::Shop_Refining_List>},
-    {Action::ShowFactions, Goto<SectionID::Shop_MainFactions>},
-    {Action::ShowStationExterior, Goto<SectionID::Starbase_Exterior>},
-    {Action::NativeShortcutGalaxy, Native<"OnGalaxyAction">},
-    {Action::ShowGalaxy, GotoNavigation<SectionID::Navigation_Galaxy>},
-    {Action::ShowStationInterior, Goto<SectionID::Starbase_Interior>},
-    {Action::ShowHaven, ShowHaven},
-    {Action::ShowSystem, GotoNavigation<SectionID::Navigation_System>},
-    {Action::ShowArtifacts, Goto<SectionID::ArtifactHall_Inventory>},
-    {Action::ShowShipConstruction, Native<"OnShipsAction">},
-    {Action::ShowOfficerSwap, ShowOfficerSwap},
-    {Action::ShowShipSwap, ShowShipSwap},
-    {Action::ShowShields, Native<"OnPeaceShieldAction">},
-    {Action::ShowBattlelogs, Native<"OnInboxAction">},
-    {Action::ShowInventory, Goto<SectionID::InventoryList>},
-    {Action::ShowMissions, Goto<SectionID::Missions_AcceptedList>},
-    {Action::ShowResearch, Goto<SectionID::Research_LandingPage>},
-    {Action::ShowScrapYard, Goto<SectionID::ShipScrapping_List>},
-    {Action::ShowOfficers, Goto<SectionID::OfficerInventory>},
-    {Action::ShowOfficerPresets, ShowOfficerPresets},
+    {Action::kShowQTrials, Goto<SectionID::ChallengeSelection>},
+    {Action::kShowBookmarks, ShowBookmarks},
+    {Action::kShowLookup, ShowCoordinateSearch},
+    {Action::kShowRefinery, Goto<SectionID::Shop_Refining_List>},
+    {Action::kShowFactions, Goto<SectionID::Shop_MainFactions>},
+    {Action::kShowStationExterior, Goto<SectionID::Starbase_Exterior>},
+    {Action::kNativeShortcutGalaxy, Native<"OnGalaxyAction">},
+    {Action::kShowGalaxy, GotoNavigation<SectionID::Navigation_Galaxy>},
+    {Action::kShowStationInterior, Goto<SectionID::Starbase_Interior>},
+    {Action::kShowHaven, ShowHaven},
+    {Action::kShowSystem, GotoNavigation<SectionID::Navigation_System>},
+    {Action::kShowArtifacts, Goto<SectionID::ArtifactHall_Inventory>},
+    {Action::kShowShipConstruction, Native<"OnShipsAction">},
+    {Action::kShowOfficerSwap, ShowOfficerSwap},
+    {Action::kShowShipSwap, ShowShipSwap},
+    {Action::kShowShields, Native<"OnPeaceShieldAction">},
+    {Action::kShowBattlelogs, Native<"OnInboxAction">},
+    {Action::kShowInventory, Goto<SectionID::InventoryList>},
+    {Action::kShowMissions, Goto<SectionID::Missions_AcceptedList>},
+    {Action::kShowResearch, Goto<SectionID::Research_LandingPage>},
+    {Action::kShowScrapYard, Goto<SectionID::ShipScrapping_List>},
+    {Action::kShowOfficers, Goto<SectionID::OfficerInventory>},
+    {Action::kShowOfficerPresets, ShowOfficerPresets},
     // TODO: opens the first fleet commander (Spock), not the selected fleet's.
-    {Action::ShowCommander, Goto<SectionID::FleetCommander_Management>},
-    {Action::ShowAwayTeam, Goto<SectionID::Missions_AwayTeamsList>},
-    {Action::NativeShortcutEvents, Native<"OnEventsAction">},
-    {Action::ShowEvents, Goto<SectionID::Tournament_Group_Selection>},
-    {Action::ShowExoComp, Goto<SectionID::Consumables>},
-    {Action::ShowDaily, Goto<SectionID::Missions_DailyGoals>},
-    {Action::ShowGifts, Goto<SectionID::Shop_List>},
-    {Action::ShowAlliance, Goto<SectionID::Alliance_Main>},
-    {Action::ShowAllianceHelp, Goto<SectionID::Alliance_Help>},
-    {Action::ShowAllianceArmada, Goto<SectionID::Alliance_Armadas>},
-    {Action::ShowSettings, Goto<SectionID::GameSettings>},
-    {Action::ShowShips, OpenManageShips, false},
+    {Action::kShowCommander, Goto<SectionID::FleetCommander_Management>},
+    {Action::kShowAwayTeam, Goto<SectionID::Missions_AwayTeamsList>},
+    {Action::kNativeShortcutEvents, Native<"OnEventsAction">},
+    {Action::kShowEvents, Goto<SectionID::Tournament_Group_Selection>},
+    {Action::kShowExoComp, Goto<SectionID::Consumables>},
+    {Action::kShowDaily, Goto<SectionID::Missions_DailyGoals>},
+    {Action::kShowGifts, Goto<SectionID::Shop_List>},
+    {Action::kShowAlliance, Goto<SectionID::Alliance_Main>},
+    {Action::kShowAllianceHelp, Goto<SectionID::Alliance_Help>},
+    {Action::kShowAllianceArmada, Goto<SectionID::Alliance_Armadas>},
+    {Action::kShowSettings, Goto<SectionID::GameSettings>},
+    {Action::kShowShips, OpenManageShips, false},
 };
 
 // Left and right step through docks, ship lists, artifacts and officer pages on the screens that have them,
@@ -225,7 +226,7 @@ bool StepScreen(bool left)
     bool moved = false;
     for (auto* widget : ObjectFinder<AssignShipsWidget>::GetAll()) {
       auto* list = widget && CanvasController::Shows(widget) && widget->isActiveAndEnabled() ? widget->selectableList()
-                                                                                              : nullptr;
+                                                                                             : nullptr;
       if (!list || list->Count() <= 0)
         continue;
       // Skip empty dock slots.
@@ -326,11 +327,11 @@ bool PressAwaitedButton()
 
 bool ScreenShortcuts()
 {
-  if (Shortcut::IsDown(Action::MoveLeft) && StepScreen(true))
+  if (Shortcut::IsDown(Action::kMoveLeft) && StepScreen(true))
     return true;
-  if (Shortcut::IsDown(Action::MoveRight) && StepScreen(false))
+  if (Shortcut::IsDown(Action::kMoveRight) && StepScreen(false))
     return true;
-  if (Config::Get().ui.focus_search && Shortcut::IsDown(Action::FocusSearch) && FocusSearchBox())
+  if (Config::Get().ui.focus_search && Shortcut::IsDown(Action::kFocusSearch) && FocusSearchBox())
     return true;
   for (const auto& screen : kScreens) {
     if (Shortcut::IsDown(screen.shortcut)) {

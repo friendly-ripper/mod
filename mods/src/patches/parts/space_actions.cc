@@ -3,9 +3,9 @@
 // target's cargo when it is scanned, and the action queue switch.
 
 #include "config.h"
-#include "patches/input.h"
-#include "patches/object_tracker.h"
 #include "patches/patches.h"
+#include "patches/object_tracker.h"
+#include "patches/input.h"
 #include "patches/shortcuts.h"
 
 #include "prime/Hub.h"
@@ -383,8 +383,8 @@ bool SelectShipShortcuts()
   using Clock = std::chrono::steady_clock;
   // The number keys select a ship in the fleet bar; pressing the same one again within select_timer flies the
   // camera to it. With disable_preview_locate, the second press only selects while a target card is open.
-  constexpr Action kShips[]   = {Action::SelectShip1, Action::SelectShip2, Action::SelectShip3, Action::SelectShip4,
-                                 Action::SelectShip5, Action::SelectShip6, Action::SelectShip7, Action::SelectShip8};
+  constexpr Action kShips[] = {Action::kSelectShip1, Action::kSelectShip2, Action::kSelectShip3, Action::kSelectShip4,
+                               Action::kSelectShip5, Action::kSelectShip6, Action::kSelectShip7, Action::kSelectShip8};
   static auto      last_press = Clock::now();
   static int32_t   last_index = -1;
 
@@ -418,14 +418,14 @@ bool SelectShipShortcuts()
 
 bool FleetShortcuts()
 {
-  if (Shortcut::IsDown(Action::SelectCurrent)) {
+  if (Shortcut::IsDown(Action::kSelectCurrent)) {
     auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get();
     if (auto* fleet = fleet_bar ? fleet_bar->SelectedFleet() : nullptr) {
       ViewSelectedFleet(fleet);
       return true;
     }
   }
-  if (Shortcut::IsDown(Action::ToggleQueue)) {
+  if (Shortcut::IsDown(Action::kToggleQueue)) {
     auto& queue_enabled = Config::Get().control.queue_enabled;
     queue_enabled       = !queue_enabled;
     ResetQueueRecoveryTracking();
@@ -446,7 +446,7 @@ bool FleetActionShortcuts()
 
   // Escape or the primary action dismisses the golden rewards screen. Down, not Pressed: a held Escape would go
   // back a section every frame while the screen closes.
-  if (Shortcut::IsDown(Action::ActionPrimary) || Key::Down(KeyCode::Escape)) {
+  if (Shortcut::IsDown(Action::kActionPrimary) || Key::Down(KeyCode::Escape)) {
     if (auto* rewards = ObjectFinder<AnimatedRewardsScreenViewController>::Get(); rewards && rewards->IsActive()) {
       rewards->GoBackToLastSection();
       return true;
@@ -454,15 +454,15 @@ bool FleetActionShortcuts()
   }
 
   Pressed pressed{
-      .primary     = Shortcut::IsDown(Action::ActionPrimary),
-      .secondary   = Shortcut::IsDown(Action::ActionSecondary),
-      .queue       = Shortcut::IsDown(Action::ActionQueue),
-      .queue_clear = Shortcut::IsDown(Action::ActionQueueClear),
+      .primary     = Shortcut::IsDown(Action::kActionPrimary),
+      .secondary   = Shortcut::IsDown(Action::kActionSecondary),
+      .queue       = Shortcut::IsDown(Action::kActionQueue),
+      .queue_clear = Shortcut::IsDown(Action::kActionQueueClear),
       // With disable_preview_recall, recall only works while no target card is open.
-      .recall        = Shortcut::IsDown(Action::ActionRecall)
-                       && (!Config::Get().ui.disable_preview_recall || !TargetViewerShown()),
-      .recall_cancel = Shortcut::IsDown(Action::ActionRecallCancel),
-      .repair        = Shortcut::IsDown(Action::ActionRepair),
+      .recall =
+          Shortcut::IsDown(Action::kActionRecall) && (!Config::Get().ui.disable_preview_recall || !TargetViewerShown()),
+      .recall_cancel = Shortcut::IsDown(Action::kActionRecallCancel),
+      .repair        = Shortcut::IsDown(Action::kActionRepair),
   };
   if (replayed && !pressed.Any()) {
     pressed       = *replayed;
@@ -472,7 +472,7 @@ bool FleetActionShortcuts()
     if (auto* fleet_bar = ObjectFinder<FleetBarViewController>::Get())
       ActOnSelectedFleet(fleet_bar, pressed);
 
-  if (Shortcut::IsDown(Action::ActionView))
+  if (Shortcut::IsDown(Action::kActionView))
     ToggleTargetCargo();
   if (show_cargo_frames > 0)
     ShowPendingTargetCargo();

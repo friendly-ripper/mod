@@ -225,8 +225,7 @@ struct BookmarksManager : MonoSingleton<BookmarksManager> {
     context->SetDefaultXCoordinate(zero);
     context->SetDefaultYCoordinate(zero);
     context->SetDefaultSystemInput(il2cpp_string_new(""));
-    Hub::Sections()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false,
-                                                    true);
+    Hub::Sections()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false, true);
   }
 };
 

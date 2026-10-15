@@ -138,7 +138,7 @@ void LogBanner()
   spdlog::info("");
 }
 
-int64_t il2cpp_init_hook(auto original, const char* domain_name)
+int64_t il2cpp_init_Hook(auto original, const char* domain_name)
 {
 #if _WIN32 && !defined(NDEBUG)
   AllocConsole();
@@ -227,7 +227,7 @@ void StartMod()
 #else
     auto il2cpp_init = dlsym(assembly, "il2cpp_init");
 #endif
-    SPUD_STATIC_DETOUR(il2cpp_init, il2cpp_init_hook);
+    SPUD_STATIC_DETOUR(il2cpp_init, il2cpp_init_Hook);
   } catch (const std::exception& error) {
     fprintf(stderr, "stfc-community-mod: failed to hook il2cpp_init: %s\n", error.what());
   }

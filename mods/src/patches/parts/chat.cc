@@ -118,8 +118,8 @@ void ChatPreviewController_OnRegionalMessageReceived_Hook(auto original, ChatPre
 
 void OpenChatShortcut()
 {
-  const bool side = Shortcut::IsDown(Action::ShowChatSide1) || Shortcut::IsDown(Action::ShowChatSide2);
-  if (!side && !Shortcut::IsDown(Action::ShowChat))
+  const bool side = Shortcut::IsDown(Action::kShowChatSide1) || Shortcut::IsDown(Action::kShowChatSide2);
+  if (!side && !Shortcut::IsDown(Action::kShowChat))
     return;
   auto* chat = ChatManager::Instance();
   if (!chat)
@@ -142,9 +142,9 @@ bool ChatChannelShortcuts()
   auto* chat = ChatManager::Instance();
   if (!chat)
     return false;
-  for (auto [shortcut, channel] : {std::pair{Action::SelectChatGlobal, ChatChannelCategory::Global},
-                                   std::pair{Action::SelectChatAlliance, ChatChannelCategory::Alliance},
-                                   std::pair{Action::SelectChatPrivate, ChatChannelCategory::Private}}) {
+  for (auto [shortcut, channel] : {std::pair{Action::kSelectChatGlobal, ChatChannelCategory::Global},
+                                   std::pair{Action::kSelectChatAlliance, ChatChannelCategory::Alliance},
+                                   std::pair{Action::kSelectChatPrivate, ChatChannelCategory::Private}}) {
     if (Shortcut::IsDown(shortcut)) {
       chat->OpenChannel(channel);
       return true;

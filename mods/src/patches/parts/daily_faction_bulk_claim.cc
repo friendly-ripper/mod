@@ -44,11 +44,11 @@ int32_t MissionsHudViewController_UpdateButtons_Hook(auto original, MissionsHudV
   const auto& ui     = Config::Get().ui;
   for (const auto& button : kButtons) {
     const auto visibility = ui.MissionHudButtonVisibility(button.name);
-    if (visibility == MissionHudVisibility::Auto)
+    if (visibility == MissionHudVisibility::kAuto)
       continue;
     auto* component = button.button(_this);
     if (auto* object = component ? component->gameObject() : nullptr)
-      object->SetActive(visibility == MissionHudVisibility::Always);
+      object->SetActive(visibility == MissionHudVisibility::kAlways);
   }
   return result;
 }

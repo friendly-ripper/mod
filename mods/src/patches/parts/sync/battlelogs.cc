@@ -349,9 +349,9 @@ namespace
 
     auto& journal = battle["journal"];
     auto  names   = ResolveNames(journal);
-    Queue(SyncConfig::Type::Battles,
+    Queue(SyncConfig::Type::kBattles,
           json::array(
-              {{{"type", SyncConfig::Type::Battles}, {"names", std::move(names)}, {"journal", std::move(journal)}}}));
+              {{{"type", SyncConfig::Type::kBattles}, {"names", std::move(names)}, {"journal", std::move(journal)}}}));
   }
 
   void RunBattleLogs()

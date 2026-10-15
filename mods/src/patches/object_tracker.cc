@@ -5,8 +5,8 @@
 #include "prime/chat.h"
 #include "prime/fleet.h"
 #include "prime/inventory.h"
-#include "prime/officers.h"
 #include "prime/navigation.h"
+#include "prime/officers.h"
 #include "prime/ui.h"
 #include "prime/viewers.h"
 

@@ -58,27 +58,27 @@ struct SettingShortcut {
 
 // Shortcuts that change a setting. The game sees their keys too. The first pressed one runs.
 constexpr SettingShortcut kSettings[] = {
-    {Action::UiScaleUp, Scale<AdjustUiScale, true>, true},
-    {Action::UiScaleDown, Scale<AdjustUiScale, false>, true},
-    {Action::UiShipScaleUp, Scale<AdjustUiShipScale, true>, true},
-    {Action::UiShipScaleDown, Scale<AdjustUiShipScale, false>, true},
-    {Action::UiViewerScaleUp, Scale<AdjustUiViewerScale, true>, true},
-    {Action::UiViewerScaleDown, Scale<AdjustUiViewerScale, false>, true},
-    {Action::ToggleAutoConfirmInstantWarp, CycleInstantWarpConfirmation},
-    {Action::TogglePreviewLocate, Toggle<&Config::ui, &Config::Ui::disable_preview_locate>},
-    {Action::TogglePreviewRecall, Toggle<&Config::ui, &Config::Ui::disable_preview_recall>},
-    {Action::ToggleCargoDefault, Toggle<&Config::ui, &Config::Ui::show_cargo_default>},
-    {Action::ToggleCargoPlayer, Toggle<&Config::ui, &Config::Ui::show_player_cargo>},
-    {Action::ToggleCargoStation, Toggle<&Config::ui, &Config::Ui::show_station_cargo>},
-    {Action::ToggleCargoHostile, Toggle<&Config::ui, &Config::Ui::show_hostile_cargo>},
-    {Action::ToggleCargoArmada, Toggle<&Config::ui, &Config::Ui::show_armada_cargo>},
-    {Action::LogLevelOff, SetLogLevel<spdlog::level::off>},
-    {Action::LogLevelError, SetLogLevel<spdlog::level::err>},
-    {Action::LogLevelWarn, SetLogLevel<spdlog::level::warn>},
-    {Action::LogLevelInfo, SetLogLevel<spdlog::level::info>},
-    {Action::LogLevelDebug, SetLogLevel<spdlog::level::debug>},
-    {Action::LogLevelTrace, SetLogLevel<spdlog::level::trace>},
-    {Action::ReloadSettings, ReloadSettings},
+    {Action::kUiScaleUp, Scale<AdjustUiScale, true>, true},
+    {Action::kUiScaleDown, Scale<AdjustUiScale, false>, true},
+    {Action::kUiShipScaleUp, Scale<AdjustUiShipScale, true>, true},
+    {Action::kUiShipScaleDown, Scale<AdjustUiShipScale, false>, true},
+    {Action::kUiViewerScaleUp, Scale<AdjustUiViewerScale, true>, true},
+    {Action::kUiViewerScaleDown, Scale<AdjustUiViewerScale, false>, true},
+    {Action::kToggleAutoConfirmInstantWarp, CycleInstantWarpConfirmation},
+    {Action::kTogglePreviewLocate, Toggle<&Config::ui, &Config::Ui::disable_preview_locate>},
+    {Action::kTogglePreviewRecall, Toggle<&Config::ui, &Config::Ui::disable_preview_recall>},
+    {Action::kToggleCargoDefault, Toggle<&Config::ui, &Config::Ui::show_cargo_default>},
+    {Action::kToggleCargoPlayer, Toggle<&Config::ui, &Config::Ui::show_player_cargo>},
+    {Action::kToggleCargoStation, Toggle<&Config::ui, &Config::Ui::show_station_cargo>},
+    {Action::kToggleCargoHostile, Toggle<&Config::ui, &Config::Ui::show_hostile_cargo>},
+    {Action::kToggleCargoArmada, Toggle<&Config::ui, &Config::Ui::show_armada_cargo>},
+    {Action::kLogLevelOff, SetLogLevel<spdlog::level::off>},
+    {Action::kLogLevelError, SetLogLevel<spdlog::level::err>},
+    {Action::kLogLevelWarn, SetLogLevel<spdlog::level::warn>},
+    {Action::kLogLevelInfo, SetLogLevel<spdlog::level::info>},
+    {Action::kLogLevelDebug, SetLogLevel<spdlog::level::debug>},
+    {Action::kLogLevelTrace, SetLogLevel<spdlog::level::trace>},
+    {Action::kReloadSettings, ReloadSettings},
 };
 
 void SettingShortcuts()
@@ -135,13 +135,13 @@ bool HandleShortcuts()
 {
   auto& config = Config::Get();
 
-  if (Shortcut::IsDown(Action::DisableHotKeys)) {
+  if (Shortcut::IsDown(Action::kDisableHotKeys)) {
     HideKeybindBadges();
     config.control.hotkeys_enabled = false;
     spdlog::warn("Setting hotkeys to DISABLED");
     return true;
   }
-  if (Shortcut::IsDown(Action::EnableHotKeys)) {
+  if (Shortcut::IsDown(Action::kEnableHotKeys)) {
     config.control.hotkeys_enabled = true;
     spdlog::warn("Setting hotkeys to ENABLED");
     return true;
@@ -158,16 +158,16 @@ bool HandleShortcuts()
 
   // Keys typed into a text field (chat, search) are text, not shortcuts.
   const bool typing = Key::IsInputFocused();
-  if (!typing && Shortcut::IsDown(Action::ToggleShortcutHints) && ToggleKeybindBadges())
+  if (!typing && Shortcut::IsDown(Action::kToggleShortcutHints) && ToggleKeybindBadges())
     return true;
 
-  if (!typing && Shortcut::IsDown(Action::Restart)) {
+  if (!typing && Shortcut::IsDown(Action::kRestart)) {
     spdlog::info("Clearing localisation cache and restarting");
     LanguageManager::ClearCache();
     Hub::App()->Reload();
     return true;
   }
-  if (!typing && Shortcut::IsDown(Action::Quit)) {
+  if (!typing && Shortcut::IsDown(Action::kQuit)) {
 #ifdef _WIN32
     TerminateProcess(GetCurrentProcess(), 1);
 #else

@@ -63,7 +63,7 @@ bool ApplyProfileTitle()
 // with a tested trigger if the fallback is still seen.
 // With free_resize the original is skipped: the game's per-frame aspect-ratio enforcement is what would snap the
 // window back.
-void AspectRatioConstraintHandler_Update(auto original, void* _this)
+void AspectRatioConstraintHandler_Update_Hook(auto original, void* _this)
 {
   static bool title_pending = !File::Profile().empty();
   if (title_pending && ApplyProfileTitle())
@@ -81,7 +81,8 @@ void Cursor_SetCursor_Hook(auto original, void* _this, ptrdiff_t texture, Vector
   ClipCursor(nullptr);
 }
 
-intptr_t AspectRatioConstraintHandler_WndProc(auto original, HWND hWnd, uint32_t msg, intptr_t wParam, intptr_t lParam)
+intptr_t AspectRatioConstraintHandler_WndProc_Hook(auto original, HWND hWnd, uint32_t msg, intptr_t wParam,
+                                                   intptr_t lParam)
 {
   // Skip the game's aspect-ratio clamp and hand the message straight to Unity. The message arrives in the form of
   // the window's current procedure (the game's, installed through its own P/Invoke), and the A and W calls each
@@ -125,8 +126,8 @@ void InstallFreeResize()
   if (!update || !wndproc)
     return;
 
-  SPUD_STATIC_DETOUR(update.Pointer(), AspectRatioConstraintHandler_Update);
-  SPUD_STATIC_DETOUR(wndproc.Pointer(), AspectRatioConstraintHandler_WndProc);
+  SPUD_STATIC_DETOUR(update.Pointer(), AspectRatioConstraintHandler_Update_Hook);
+  SPUD_STATIC_DETOUR(wndproc.Pointer(), AspectRatioConstraintHandler_WndProc_Hook);
 }
 void InstallCursor()
 {

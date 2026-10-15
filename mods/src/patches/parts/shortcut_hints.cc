@@ -23,45 +23,45 @@ namespace
 {
 struct NativeAction {
   std::string_view name;
-  Action     primary;
-  Action     fallback = Action::Max;
+  Action           primary;
+  Action           fallback = Action::kCount;
 };
 
 // The game's input action names and the mod actions that replace them.
 constexpr auto kNativeActions = std::to_array<NativeAction>({
-    {"interior_view", Action::ShowStationInterior},
-    {"exterior_view", Action::ShowStationExterior},
-    {"system_view", Action::ShowSystem},
-    {"galaxy_view", Action::ShowGalaxy},
-    {"events", Action::ShowEvents},
-    {"ship_a", Action::SelectShip1},
-    {"ship_b", Action::SelectShip2},
-    {"ship_c", Action::SelectShip3},
-    {"ship_d", Action::SelectShip4},
-    {"ship_e", Action::SelectShip5},
-    {"ship_f", Action::SelectShip6},
-    {"ship_g", Action::SelectShip7},
-    {"ship_h", Action::SelectShip8},
-    {"alliance", Action::ShowAlliance},
-    {"chat", Action::ShowChat},
-    {"side_chat", Action::ShowChatSide1, Action::ShowChatSide2},
-    {"away_teams", Action::ShowAwayTeam},
-    {"missions", Action::ShowMissions},
-    {"daily_goals", Action::ShowDaily},
-    {"ship_locate", Action::SelectCurrent},
-    {"ship_manage", Action::ShowShips},
-    {"research", Action::ShowResearch},
-    {"consumables", Action::ShowExoComp},
-    {"ship_recall", Action::ActionRecall},
-    {"show_keybindings", Action::ToggleShortcutHints},
-    {"gifts", Action::ShowGifts},
-    {"help_alliance", Action::ShowAllianceHelp},
-    {"officers", Action::ShowOfficers},
-    {"factions", Action::ShowFactions},
-    {"items", Action::ShowInventory},
-    {"refinery", Action::ShowRefinery},
-    {"commanders", Action::ShowCommander},
-    {"challenges", Action::ShowQTrials},
+    {"interior_view", Action::kShowStationInterior},
+    {"exterior_view", Action::kShowStationExterior},
+    {"system_view", Action::kShowSystem},
+    {"galaxy_view", Action::kShowGalaxy},
+    {"events", Action::kShowEvents},
+    {"ship_a", Action::kSelectShip1},
+    {"ship_b", Action::kSelectShip2},
+    {"ship_c", Action::kSelectShip3},
+    {"ship_d", Action::kSelectShip4},
+    {"ship_e", Action::kSelectShip5},
+    {"ship_f", Action::kSelectShip6},
+    {"ship_g", Action::kSelectShip7},
+    {"ship_h", Action::kSelectShip8},
+    {"alliance", Action::kShowAlliance},
+    {"chat", Action::kShowChat},
+    {"side_chat", Action::kShowChatSide1, Action::kShowChatSide2},
+    {"away_teams", Action::kShowAwayTeam},
+    {"missions", Action::kShowMissions},
+    {"daily_goals", Action::kShowDaily},
+    {"ship_locate", Action::kSelectCurrent},
+    {"ship_manage", Action::kShowShips},
+    {"research", Action::kShowResearch},
+    {"consumables", Action::kShowExoComp},
+    {"ship_recall", Action::kActionRecall},
+    {"show_keybindings", Action::kToggleShortcutHints},
+    {"gifts", Action::kShowGifts},
+    {"help_alliance", Action::kShowAllianceHelp},
+    {"officers", Action::kShowOfficers},
+    {"factions", Action::kShowFactions},
+    {"items", Action::kShowInventory},
+    {"refinery", Action::kShowRefinery},
+    {"commanders", Action::kShowCommander},
+    {"challenges", Action::kShowQTrials},
 });
 
 constexpr const NativeAction* FindNativeAction(std::string_view name)
@@ -82,7 +82,7 @@ consteval bool NativeActionsAreUnique()
 }
 
 static_assert(NativeActionsAreUnique());
-static_assert(FindNativeAction("side_chat")->fallback == Action::ShowChatSide2);
+static_assert(FindNativeAction("side_chat")->fallback == Action::kShowChatSide2);
 static_assert(FindNativeAction("unknown") == nullptr);
 
 // The badge text for a native action: its mod binding, or "-" when it has none.
@@ -92,7 +92,7 @@ std::string BadgeText(std::string_view action_name)
   if (!action)
     return "-";
   auto hint_action = action->primary;
-  if (hint_action >= Action::SelectShip1 && hint_action <= Action::SelectShip8) {
+  if (hint_action >= Action::kSelectShip1 && hint_action <= Action::kSelectShip8) {
     // Use the same context array as FleetBarViewController::RequestSelect(int, bool), not the native dock index.
     auto* bar     = ObjectFinder<FleetBarViewController>::Get();
     auto* context = bar ? bar->CanvasContext() : nullptr;
@@ -102,9 +102,9 @@ std::string BadgeText(std::string_view action_name)
       return fleet ? fleet->Index() : -1;
     });
   }
-  auto hint = hint_action == Action::Max ? std::string{} : Shortcut::Hint(hint_action);
+  auto hint = hint_action == Action::kCount ? std::string{} : Shortcut::Hint(hint_action);
 
-  if (hint.empty() && action->fallback != Action::Max)
+  if (hint.empty() && action->fallback != Action::kCount)
 
     hint = Shortcut::Hint(action->fallback);
   return hint.empty() ? "-" : hint;
@@ -168,7 +168,7 @@ void HideKeybindBadges()
 void InstallKeybindBadges()
 {
   // Settings are parsed before installation; NONE, empty and invalid bindings opt out.
-  if (!Shortcut::HasBinding(Action::ToggleShortcutHints))
+  if (!Shortcut::HasBinding(Action::kToggleShortcutHints))
     return;
 
   // Only the detour targets gate the feature. Members the badge path reads resolve on first use; a missing one is

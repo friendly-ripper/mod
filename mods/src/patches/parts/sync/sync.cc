@@ -6,10 +6,10 @@
 #include "patches/patches.h"
 #include "str_utils.h"
 
-#include <Digit.PrimeServer.Models.pb.h>
-#include <google/protobuf/repeated_field.h>
 #include "prime/Hub.h"
 #include "prime/server.h"
+#include <Digit.PrimeServer.Models.pb.h>
+#include <google/protobuf/repeated_field.h>
 #include "prime/UserProfileManager.h"
 
 #include <il2cpp/il2cpp.h>
@@ -205,7 +205,7 @@ namespace
       critical_trait_scores.push_back({{"tid", tid}, {"score", score}});
 
     // The chances are in the de-dup hash, so an assignment is sent again when they change.
-    json record{{"type", SyncConfig::Type::AwayAssignments},
+    json record{{"type", SyncConfig::Type::kAwayAssignments},
                 {"aid", instance.id()},
                 {"template_id", instance.awayassignmenttemplateid()},
                 {"state", instance.state()},
@@ -235,14 +235,14 @@ namespace
       return;
     Trace("away assignments", response->instances_size());
 
-    Batch                       batch(SyncConfig::Type::AwayAssignments);
+    Batch                       batch(SyncConfig::Type::kAwayAssignments);
     std::unordered_set<int64_t> present;
     for (const auto& instance : response->instances()) {
       present.insert(instance.id());
       AddAwayAssignment(batch, instance);
     }
     sent.away_assignments.Prune(present, [&](int64_t id) {
-      batch.Add({{"type", "collected_" + SyncConfig::Type::AwayAssignments}, {"aid", id}});
+      batch.Add({{"type", "collected_" + SyncConfig::Type::kAwayAssignments}, {"aid", id}});
     });
     batch.Send(&sent.first_away_assignments);
   }
@@ -255,7 +255,7 @@ namespace
       return;
     logging::trace("PROCESS", "away assignment", "Processing away assignment {}", instance->id());
 
-    Batch batch(SyncConfig::Type::AwayAssignments);
+    Batch batch(SyncConfig::Type::kAwayAssignments);
     AddAwayAssignment(batch, *instance);
     batch.Send();
   }
@@ -280,20 +280,20 @@ namespace
       return;
     Trace("global buffs", response->globalactivebuffs_size());
 
-    Batch                       batch(SyncConfig::Type::Buffs);
+    Batch                       batch(SyncConfig::Type::kBuffs);
     std::unordered_set<int64_t> present;
     for (const auto& buff : response->globalactivebuffs()) {
       present.insert(buff.buffid());
       const bool    expires = buff.has_activebuff() && buff.activebuff().has_expirytime();
       const int64_t expiry  = expires ? buff.activebuff().expirytime().seconds() : -1;
       if (sent.buffs.Changed(buff.buffid(), {buff.level(), expiry}))
-        batch.Add({{"type", SyncConfig::Type::Buffs},
+        batch.Add({{"type", SyncConfig::Type::kBuffs},
                    {"bid", buff.buffid()},
                    {"level", buff.level()},
                    {"expiry_time", expires ? json(expiry) : json(nullptr)}});
     }
     sent.buffs.Prune(present,
-                     [&](int64_t id) { batch.Add({{"type", "expired_" + SyncConfig::Type::Buffs}, {"bid", id}}); });
+                     [&](int64_t id) { batch.Add({{"type", "expired_" + SyncConfig::Type::kBuffs}, {"bid", id}}); });
     batch.Send(&sent.first_buffs);
   }
 
@@ -314,8 +314,8 @@ namespace
         level = std::max(level, value);
       }
       if (level != std::exchange(sent.emerald_chain_level, level)) {
-        Batch batch(SyncConfig::Type::EmeraldChain);
-        batch.Add({{"type", SyncConfig::Type::EmeraldChain}, {"level", level}});
+        Batch batch(SyncConfig::Type::kEmeraldChain);
+        batch.Add({{"type", SyncConfig::Type::kEmeraldChain}, {"level", level}});
         batch.Send();
       }
       return;
@@ -329,10 +329,10 @@ namespace
       return;
     Trace("starbase modules", response->modulestates_size());
 
-    Batch batch(SyncConfig::Type::Buildings);
+    Batch batch(SyncConfig::Type::kBuildings);
     for (const auto& module : response->modulestates())
       if (sent.modules.Changed(module.id(), module.level()))
-        batch.Add({{"type", SyncConfig::Type::Buildings}, {"bid", module.id()}, {"level", module.level()}});
+        batch.Add({{"type", SyncConfig::Type::kBuildings}, {"bid", module.id()}, {"level", module.level()}});
     batch.Send();
   }
 
@@ -345,10 +345,10 @@ namespace
       return;
     Trace("planetary base data", response->pieces_size());
 
-    Batch batch(SyncConfig::Type::Haven);
+    Batch batch(SyncConfig::Type::kHaven);
     for (const auto& [piece, count] : response->pieces())
       if (sent.haven_pieces.Changed(piece, count))
-        batch.Add({{"type", SyncConfig::Type::Haven + "_pieces"}, {"sid", piece}, {"count", count}});
+        batch.Add({{"type", SyncConfig::Type::kHaven + "_pieces"}, {"sid", piece}, {"count", count}});
     batch.Send();
   }
 
@@ -362,10 +362,10 @@ namespace
       return;
     Trace("planetary map data", response->buildings_size());
 
-    Batch batch(SyncConfig::Type::Haven);
+    Batch batch(SyncConfig::Type::kHaven);
     for (const auto& [id, building] : response->buildings())
       if (sent.haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
-        batch.Add({{"type", SyncConfig::Type::Haven}, {"sid", building.specid()}, {"id", id},
+        batch.Add({{"type", SyncConfig::Type::kHaven}, {"sid", building.specid()}, {"id", id},
                    {"level", building.level()}, {"status", building.status()}, {"position", building.position()}});
     FirstSync first;
     batch.Send(&first);
@@ -384,10 +384,10 @@ namespace
       if (!user_id || owner != to_string(user_id))
         return;
     }
-    Batch batch(SyncConfig::Type::Haven);
+    Batch batch(SyncConfig::Type::kHaven);
     for (const auto& [id, building] : response->mapdata().buildings())
       if (sent.haven_map_buildings.Changed(id, {building.level(), static_cast<int32_t>(building.status()), building.position()}))
-        batch.Add({{"type", SyncConfig::Type::Haven}, {"sid", building.specid()}, {"id", id},
+        batch.Add({{"type", SyncConfig::Type::kHaven}, {"sid", building.specid()}, {"id", id},
                    {"level", building.level()}, {"status", building.status()}, {"position", building.position()}});
     FirstSync first;
     batch.Send(&first);
@@ -401,8 +401,8 @@ namespace
     if (!response)
       return;
 
-    Batch batch(SyncConfig::Type::Haven);
-    batch.Add({{"type", SyncConfig::Type::Haven + "_prosperity"}, {"prosperity", response->prosperity()}});
+    Batch batch(SyncConfig::Type::kHaven);
+    batch.Add({{"type", SyncConfig::Type::kHaven + "_prosperity"}, {"prosperity", response->prosperity()}});
     FirstSync first;
     batch.Send(&first);
   }
@@ -414,14 +414,14 @@ namespace
       return;
     Trace("player inventories", response->inventories_size());
 
-    Batch batch(SyncConfig::Type::Inventory);
+    Batch batch(SyncConfig::Type::kInventory);
     for (const auto& items : response->inventories() | std::views::values) {
       for (const auto& item : items.items()) {
         if (!item.has_commonparams())
           continue;
         const auto id = item.commonparams().refid();
         if (sent.inventory.Changed({item.type(), id}, item.count()))
-          batch.Add({{"type", SyncConfig::Type::Inventory},
+          batch.Add({{"type", SyncConfig::Type::kInventory},
                      {"item_type", item.type()},
                      {"refid", id},
                      {"count", item.count()}});
@@ -460,7 +460,7 @@ namespace
       return;
     Trace("jobs", response->jobs_size());
 
-    Batch                           batch(SyncConfig::Type::Jobs);
+    Batch                           batch(SyncConfig::Type::kJobs);
     std::unordered_set<std::string> present;
     for (const auto& job : response->jobs()) {
       present.insert(job.uuid());
@@ -469,7 +469,7 @@ namespace
       auto details = JobDetails(job);
       if (!details)
         continue;
-      json record{{"type", SyncConfig::Type::Jobs},
+      json record{{"type", SyncConfig::Type::kJobs},
                   {"job_type", job.type()},
                   {"uuid", job.uuid()},
                   {"start_time", job.starttime().seconds()},
@@ -479,7 +479,7 @@ namespace
       batch.Add(std::move(record));
     }
     sent.active_jobs.Prune(present, [&](const std::string& uuid) {
-      batch.Add({{"type", "completed_" + SyncConfig::Type::Jobs}, {"uuid", uuid}});
+      batch.Add({{"type", "completed_" + SyncConfig::Type::kJobs}, {"uuid", uuid}});
     });
     batch.Send(&sent.first_jobs);
   }
@@ -500,13 +500,13 @@ namespace
     sent.active_missions_sent = true;
     sent.active_missions      = std::move(current);
 
-    Batch batch(SyncConfig::Type::Missions);
+    Batch batch(SyncConfig::Type::kMissions);
     for (const auto mission : sent.active_missions)
-      batch.Add({{"type", "active_" + SyncConfig::Type::Missions}, {"mid", mission}});
+      batch.Add({{"type", "active_" + SyncConfig::Type::kMissions}, {"mid", mission}});
     // An empty set has no records to send, so targets would keep showing the last mission active. One record with
     // a null mission id stands for "no active missions".
     if (sent.active_missions.empty())
-      batch.Add({{"type", "active_" + SyncConfig::Type::Missions}, {"mid", nullptr}});
+      batch.Add({{"type", "active_" + SyncConfig::Type::kMissions}, {"mid", nullptr}});
     batch.Send();
   }
 
@@ -518,10 +518,10 @@ namespace
       return;
     Trace("completed missions", response->completedmissions_size());
 
-    Batch batch(SyncConfig::Type::Missions);
+    Batch batch(SyncConfig::Type::kMissions);
     for (const auto mission : response->completedmissions())
       if (sent.completed_missions.insert(mission).second)
-        batch.Add({{"type", SyncConfig::Type::Missions}, {"mid", mission}});
+        batch.Add({{"type", SyncConfig::Type::kMissions}, {"mid", mission}});
     batch.Send();
   }
 
@@ -532,10 +532,10 @@ namespace
       return;
     Trace("officers", response->officers_size());
 
-    Batch batch(SyncConfig::Type::Officer);
+    Batch batch(SyncConfig::Type::kOfficer);
     for (const auto& officer : response->officers())
       if (sent.officers.Changed(officer.id(), {officer.rankindex(), officer.level(), officer.shardcount()}))
-        batch.Add({{"type", SyncConfig::Type::Officer},
+        batch.Add({{"type", SyncConfig::Type::kOfficer},
                    {"oid", officer.id()},
                    {"rank", officer.rankindex()},
                    {"level", officer.level()},
@@ -550,10 +550,10 @@ namespace
       return;
     Trace("research projects", response->researchprojectlevels_size());
 
-    Batch batch(SyncConfig::Type::Research);
+    Batch batch(SyncConfig::Type::kResearch);
     for (const auto& [id, level] : response->researchprojectlevels())
       if (sent.research.Changed(id, level))
-        batch.Add({{"type", SyncConfig::Type::Research}, {"rid", id}, {"level", level}});
+        batch.Add({{"type", SyncConfig::Type::kResearch}, {"rid", id}, {"level", level}});
     batch.Send();
   }
 
@@ -564,7 +564,7 @@ namespace
   {
     if (state.Changed(id, amount))
       batch.Add(
-          {{"type", std::string(prefix) + to_string(SyncConfig::Type::Resources)}, {"rid", id}, {"amount", amount}});
+          {{"type", std::string(prefix) + to_string(SyncConfig::Type::kResources)}, {"rid", id}, {"amount", amount}});
   }
 
   void ProcessResources(const std::string& bytes)
@@ -574,7 +574,7 @@ namespace
       return;
     Trace("resources", response->resources_size());
 
-    Batch batch(SyncConfig::Type::Resources);
+    Batch batch(SyncConfig::Type::kResources);
     for (const auto& resource : response->resources())
       AddResource(batch, sent.resources, "", resource.id(), resource.currentamount());
     batch.Send(&sent.first_resources);
@@ -587,7 +587,7 @@ namespace
       return;
     Trace("resource changes", response->resources_size());
 
-    Batch batch(SyncConfig::Type::Resources);
+    Batch batch(SyncConfig::Type::kResources);
     for (const auto& resource : response->resources())
       AddResource(batch, sent.resources, "", resource.id(), resource.amount());
     batch.Send();
@@ -600,7 +600,7 @@ namespace
       return;
     Trace("alliance resources", response->items_size());
 
-    Batch batch(SyncConfig::Type::Resources);
+    Batch batch(SyncConfig::Type::kResources);
     for (const auto& item : response->items())
       if (item.has_commonparams())
         AddResource(batch, sent.alliance_resources, "alliance_", item.commonparams().refid(), item.count());
@@ -614,7 +614,7 @@ namespace
       return;
     Trace("alliance resource changes", response->resources_size());
 
-    Batch batch(SyncConfig::Type::Resources);
+    Batch batch(SyncConfig::Type::kResources);
     for (const auto& resource : response->resources())
       AddResource(batch, sent.alliance_resources, "alliance_", resource.id(), resource.amount());
     batch.Send();
@@ -627,7 +627,7 @@ namespace
                const json& params, int64_t state)
   {
     if (sent.slots.Changed(id, state))
-      batch.Add({{"type", SyncConfig::Type::Slots},
+      batch.Add({{"type", SyncConfig::Type::kSlots},
                  {"sid", id},
                  {"slot_type", slot_type},
                  {"spec_id", spec_id},
@@ -702,7 +702,7 @@ namespace
       return;
     Trace("entity slots", response->entityslots__size());
 
-    Batch batch(SyncConfig::Type::Slots);
+    Batch batch(SyncConfig::Type::kSlots);
     for (const auto& slot : response->entityslots_())
       AddSlot(batch, slot);
     batch.Send();
@@ -715,7 +715,7 @@ namespace
       return;
     Trace("entity slot groups", response->entityslots_size());
 
-    Batch batch(SyncConfig::Type::Slots);
+    Batch batch(SyncConfig::Type::kSlots);
     for (const auto& entity : response->entityslots())
       for (const auto& slot : entity.slots())
         AddSlot(batch, slot);
@@ -781,7 +781,7 @@ namespace
           return;
       }
 
-      Batch batch(SyncConfig::Type::Slots);
+      Batch batch(SyncConfig::Type::kSlots);
       AddSlot(batch, data["slot_id"].get<int64_t>(), type, data["slot_spec_id"], item, params, state);
       batch.Send();
     } catch (const json::exception& e) {
@@ -796,10 +796,10 @@ namespace
       return;
     Trace("forbidden/chaos techs", response->forbiddentechs_size());
 
-    Batch batch(SyncConfig::Type::Tech);
+    Batch batch(SyncConfig::Type::kTech);
     for (const auto& tech : response->forbiddentechs())
       if (sent.techs.Changed(tech.id(), {tech.tier(), tech.level(), tech.shardcount()}))
-        batch.Add({{"type", SyncConfig::Type::Tech},
+        batch.Add({{"type", SyncConfig::Type::kTech},
                    {"fid", tech.id()},
                    {"tier", tech.tier()},
                    {"level", tech.level()},
@@ -814,11 +814,11 @@ namespace
       return;
     Trace("officers with traits", response->activeofficertraits_size());
 
-    Batch batch(SyncConfig::Type::Traits);
+    Batch batch(SyncConfig::Type::kTraits);
     for (const auto& [officer, officer_traits] : response->activeofficertraits())
       for (const auto& trait : officer_traits.activetraits() | std::views::values)
         if (sent.traits.Changed({officer, trait.traitid()}, trait.level()))
-          batch.Add({{"type", SyncConfig::Type::Traits},
+          batch.Add({{"type", SyncConfig::Type::kTraits},
                      {"oid", officer},
                      {"tid", trait.traitid()},
                      {"level", trait.level()}});
@@ -828,7 +828,7 @@ namespace
   void AddShip(Batch& batch, int64_t id, int64_t hull_id, const ShipState& state)
   {
     if (sent.ships.Changed(id, state))
-      batch.Add({{"type", SyncConfig::Type::Ships},
+      batch.Add({{"type", SyncConfig::Type::kShips},
                  {"psid", id},
                  {"level", state.level},
                  {"level_percentage", state.level_percentage},
@@ -844,7 +844,7 @@ namespace
       return;
     Trace("ships", response->ships_size());
 
-    Batch batch(SyncConfig::Type::Ships);
+    Batch batch(SyncConfig::Type::kShips);
     for (const auto& ship : response->ships() | std::views::values)
       AddShip(batch, ship.id(), ship.hullid(),
               {ship.tier(), ship.level(), ship.levelpercentage(), {ship.components().begin(), ship.components().end()}});
@@ -868,7 +868,7 @@ namespace
 
   void ProcessJsonResources(const json& section)
   {
-    Batch batch(SyncConfig::Type::Resources);
+    Batch batch(SyncConfig::Type::kResources);
     ForEachRecord(section, "resource", [&](const std::string& id, const json& resource) {
       const auto amount = resource.at("current_amount").get<int64_t>();
       AddResource(batch, sent.resources, "", std::stoll(id), amount);
@@ -878,19 +878,19 @@ namespace
 
   void ProcessJsonModules(const json& section)
   {
-    Batch batch(SyncConfig::Type::Buildings);
+    Batch batch(SyncConfig::Type::kBuildings);
     ForEachRecord(section, "starbase module", [&](const std::string&, const json& module) {
       const auto id    = module.at("id").get<int64_t>();
       const auto level = module.at("level").get<int32_t>();
       if (sent.modules.Changed(id, level))
-        batch.Add({{"type", SyncConfig::Type::Buildings}, {"bid", id}, {"level", level}});
+        batch.Add({{"type", SyncConfig::Type::kBuildings}, {"bid", id}, {"level", level}});
     });
     batch.Send();
   }
 
   void ProcessJsonShips(const json& section)
   {
-    Batch batch(SyncConfig::Type::Ships);
+    Batch batch(SyncConfig::Type::kShips);
     ForEachRecord(section, "ship", [&](const std::string&, const json& ship) {
       AddShip(batch, ship.at("id").get<int64_t>(), ship.at("hull_id").get<int64_t>(),
               {ship.at("tier").get<int32_t>(), ship.at("level").get<int32_t>(),

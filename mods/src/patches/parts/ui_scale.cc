@@ -1,8 +1,8 @@
 // UI, object viewer, and system ship scaling, and the hotkeys that adjust them at runtime.
 
 #include "config.h"
-#include "patches/object_tracker.h"
 #include "patches/patches.h"
+#include "patches/object_tracker.h"
 #include "str_utils.h"
 
 #include "prime/fleet.h"
@@ -74,7 +74,7 @@ void ScreenManager_UpdateCanvasRootScaleFactor_Hook(auto original, ScreenManager
     scaler->SetScaleFactor(factor);
 }
 
-void CanvasController_Show(auto original, CanvasController* _this, int desiredEntryPoint, bool instant)
+void CanvasController_Show_Hook(auto original, CanvasController* _this, int desiredEntryPoint, bool instant)
 {
   const auto viewer_scale = Config::Get().graphics.ui_scale_viewer;
   if (_this && viewer_scale != 0.0f && StringIs(_this->name(), "ObjectViewerTemplate_Canvas")) {
@@ -132,7 +132,7 @@ void InstallUiScale()
     SPUD_STATIC_DETOUR(method.Pointer(), ScreenManager_UpdateCanvasRootScaleFactor_Hook);
 
   if (auto method = CanvasController::Class::Method("Show", {"System.Int32", "System.Boolean"}))
-    SPUD_STATIC_DETOUR(method.Pointer(), CanvasController_Show);
+    SPUD_STATIC_DETOUR(method.Pointer(), CanvasController_Show_Hook);
 
   WindowDpiScale(true);
 }

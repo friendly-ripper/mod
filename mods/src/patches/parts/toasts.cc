@@ -2,8 +2,8 @@
 // Windows notifications, with a readable body for battle results.
 
 #include "config.h"
-#include "patches/parts/toast_text.h"
 #include "patches/patches.h"
+#include "patches/parts/toast_text.h"
 #include "str_utils.h"
 
 #include "prime/fleet.h"
@@ -101,14 +101,21 @@ constexpr const char* kEventCategories[] = {
 };
 
 // Toasts whose Data is an EventModel; their body is prefixed with the event's category.
-constexpr ToastState kEventToasts[] = {
-    ToastState::Achievement,      ToastState::Tournament,   ToastState::ChainedEventScored,          ToastState::TreasuryProgress,           ToastState::TreasuryFull,
-    ToastState::WarchestProgress, ToastState::WarchestFull, ToastState::FactionWeeklyEventsProgress, ToastState::FactionWeeklyEventsComplete};
+constexpr ToastState kEventToasts[] = {ToastState::Achievement,
+                                       ToastState::Tournament,
+                                       ToastState::ChainedEventScored,
+                                       ToastState::TreasuryProgress,
+                                       ToastState::TreasuryFull,
+                                       ToastState::WarchestProgress,
+                                       ToastState::WarchestFull,
+                                       ToastState::FactionWeeklyEventsProgress,
+                                       ToastState::FactionWeeklyEventsComplete};
 
 // Toasts whose Data is a BattleResultHeader.
-constexpr ToastState kBattleToasts[] = {ToastState::Victory,         ToastState::Defeat,           ToastState::PartialVictory, ToastState::StationVictory,
-                                 ToastState::StationDefeat,   ToastState::StationBattle,    ToastState::IncomingAttack, ToastState::FleetBattle,
-                                 ToastState::ArmadaBattleWon, ToastState::ArmadaBattleLost, ToastState::AssaultVictory, ToastState::AssaultDefeat};
+constexpr ToastState kBattleToasts[] = {
+    ToastState::Victory,         ToastState::Defeat,           ToastState::PartialVictory, ToastState::StationVictory,
+    ToastState::StationDefeat,   ToastState::StationBattle,    ToastState::IncomingAttack, ToastState::FleetBattle,
+    ToastState::ArmadaBattleWon, ToastState::ArmadaBattleLost, ToastState::AssaultVictory, ToastState::AssaultDefeat};
 
 constexpr BattleType kPvpBattles[] = {BattleType::Fleet,       BattleType::Base,      BattleType::ArmadaBase,
                                       BattleType::ArmadaAsb,   BattleType::ArmadaMta, BattleType::PvpCuttingBeam,
