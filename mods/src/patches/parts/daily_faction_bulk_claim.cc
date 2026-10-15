@@ -27,15 +27,15 @@ template <il2cpp::Name Field> unity::Component* HudButton(MissionsHudViewControl
 { return controller->ButtonField<Field>(); }
 
 struct ButtonSetting {
-  const char*  name; // the hud_<name> setting
-  ButtonGetter button;
+  MissionHudVisibility Config::Ui::* visibility;
+  ButtonGetter                       button;
 };
 
 constexpr ButtonSetting kButtons[] = {
-    {"q_trials", HudButton<"_challengesButton">},
-    {"field_training", HudButton<"_achievementsButton">},
-    {"outposts", HudButton<"_outpostsButton">},
-    {"missions", HudButton<"_missionsButton">},
+    {&Config::Ui::hud_q_trials, HudButton<"_challengesButton">},
+    {&Config::Ui::hud_field_training, HudButton<"_achievementsButton">},
+    {&Config::Ui::hud_outposts, HudButton<"_outpostsButton">},
+    {&Config::Ui::hud_missions, HudButton<"_missionsButton">},
 };
 
 // The game decides visibility here; the hud_* settings are applied on top every time it does.
@@ -47,7 +47,7 @@ void ApplyHudVisibility(MissionsHudViewController* _this)
     return;
   const auto& ui = Config::Get().ui;
   for (const auto& button : kButtons) {
-    const auto visibility = ui.MissionHudButtonVisibility(button.name);
+    const auto visibility = ui.*button.visibility;
     if (visibility == MissionHudVisibility::kAuto)
       continue;
     auto* component = button.button(_this);
@@ -103,18 +103,6 @@ bool Claimed(std::string_view faction)
   return factions.empty() || std::ranges::find(factions, faction) != factions.end();
 }
 
-unity::Transform* FindChild(unity::Transform* root, std::string_view name)
-{
-  if (!root)
-    return nullptr;
-  if (auto* object = root->gameObject(); object && object->Name() == name)
-    return root;
-  for (int32_t i = 0; i < root->childCount(); ++i)
-    if (auto* found = FindChild(root->GetChild(i), name))
-      return found;
-  return nullptr;
-}
-
 void ShowClaimedFactionIcons(MissionViewController* controller)
 {
   auto* toggle = controller->claimAllToggle();
@@ -122,7 +110,7 @@ void ShowClaimedFactionIcons(MissionViewController* controller)
   if (!parent)
     return;
   for (const auto& faction : kFactions) {
-    auto* icon   = FindChild(parent, faction.icon);
+    auto* icon   = parent->FindNamed(faction.icon);
     auto* object = icon ? icon->gameObject() : nullptr;
     if (object)
       object->SetActive(Claimed(faction.name));

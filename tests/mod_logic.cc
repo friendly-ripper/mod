@@ -265,7 +265,11 @@ void ExampleSettings()
   compare(example, &effective, "");
 
   Check(config->graphics.ui_scale > 0.0f, "example values are applied");
-  Check(config->ui.mission_hud_buttons.size() == 4, "every mission HUD button is read");
+  Check(config->ui.hud_q_trials == MissionHudVisibility::kAuto
+            && config->ui.hud_field_training == MissionHudVisibility::kAuto
+            && config->ui.hud_outposts == MissionHudVisibility::kAuto
+            && config->ui.hud_missions == MissionHudVisibility::kAuto,
+        "example HUD settings use native visibility");
 }
 
 void DailyFactionSettings()
@@ -322,6 +326,10 @@ void UpstreamSettings()
     [ui]
     reverse_haven_history = false
     only_show_first_popup = true
+    hud_q_trials = "always"
+    hud_field_training = "never"
+    hud_outposts = "ALWAYS"
+    hud_missions = " auto "
   )"),
                                         effective, false);
   Check(configured->audio.disable_all_events
@@ -333,6 +341,11 @@ void UpstreamSettings()
             && configured->audio.alert_armada_battle_won == NotificationSound::kSuccess
             && configured->audio.alert_armada_battle_lost == NotificationSound::kNone,
         "notification sound names, aliases and invalid fallback");
+  Check(configured->ui.hud_q_trials == MissionHudVisibility::kAlways
+            && configured->ui.hud_field_training == MissionHudVisibility::kNever
+            && configured->ui.hud_outposts == MissionHudVisibility::kAlways
+            && configured->ui.hud_missions == MissionHudVisibility::kAuto,
+        "each HUD setting binds its own visibility");
   Check(Value(effective, "audio", "alert_victory") == "success"
             && Value(effective, "audio", "alert_armada_battle_lost") == "none",
         "effective sound settings use canonical names");
