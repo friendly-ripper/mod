@@ -185,8 +185,6 @@ struct Camera : il2cpp::Object {
   { Set<"farClipPlane">(value); }
   float nearClipPlane()
   { return Get<"nearClipPlane", float>(); }
-  void SetNearClipPlane(float value)
-  { Set<"nearClipPlane">(value); }
   // UnityEngine.CameraClearFlags
   int32_t clearFlags()
   { return Get<"clearFlags", int32_t>(); }
@@ -221,8 +219,6 @@ struct CanvasScaler : il2cpp::Object {
   { Set<"scaleFactor">(value); }
   vec2 referenceResolution()
   { return Get<"referenceResolution", vec2>(); }
-  void SetReferenceResolution(vec2 value)
-  { Set<"referenceResolution">(value); }
 };
 
 struct Sprite : il2cpp::Object {
@@ -308,8 +304,4 @@ struct TKTouch : il2cpp::Object {
   { return Field<"phase", TouchPhase>(); }
   void SetPhase(TouchPhase phase)
   { SetField<"phase">(phase); }
-};
-
-struct UIBehaviour : il2cpp::Object {
-  using Class = il2cpp::Class<"UnityEngine.UI", "UnityEngine.EventSystems", "UIBehaviour">;
 };
