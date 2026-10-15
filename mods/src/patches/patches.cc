@@ -31,8 +31,9 @@ struct Patch {
   bool (*enabled)(const Config&);
 };
 
-// Installed in this order; the log numbers them. Most are switched by their [patches] setting; the rest only
-// install when the feature they serve is turned on.
+// Installed in this order; the log numbers them. Only the [patches] hook groups decide what is installed, so users
+// can avoid clashing with other mods. Feature settings are read inside the hooks, which keeps every feature
+// switchable at runtime; a hook whose feature is off must return early and cheaply.
 constexpr Patch kPatches[] = {
     {"interiorzoomhooks", InstallInteriorZoomHooks, [](const Config& c) { return c.patches.interiorzoomhooks; }},
     {"chattitledisplayhooks", InstallChatTitleDisplayHooks, [](const Config& c) { return c.patches.chattitledisplayhooks; }},
