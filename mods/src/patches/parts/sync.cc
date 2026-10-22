@@ -4,9 +4,9 @@
 #include "str_utils.h"
 
 #include <Digit.PrimeServer.Models.pb.h>
-#include <il2cpp-api-types.h>
-#include <il2cpp/il2cpp_helper.h>
+#include <il2cpp/il2cpp.h>
 #include <prime/EntityGroup.h>
+#include <prime/Hub.h>
 #include <prime/RealtimeDataPayload.h>
 #include <prime/ServiceResponse.h>
 #include <prime/UserProfileManager.h>
@@ -1569,28 +1569,19 @@ static void planetary_map(std::unique_ptr<std::string>&& bytes)
         return;
       }
 
-      static auto& class_helper = profileManager->get_class_helper();
-      static auto fn = class_helper.GetMethodInfo("GetLocalUserProfile");
-
-      if (fn == nullptr ) {
-        spdlog::error("Failed to get method info for GetLocalUserProfile");
-        return;
-      }
-
-      Il2CppException* exception = nullptr;
-      auto localProfile = reinterpret_cast<UserProfile*>(il2cpp_runtime_invoke(fn, profileManager, nullptr, &exception));
-      if (exception != nullptr || localProfile == nullptr) {
+      auto* localProfile = profileManager->GetLocalUserProfile();
+      if (localProfile == nullptr) {
         spdlog::error("Failed to get local user profile");
         return;
       }
 
-      const auto userId = localProfile->UserId;
+      const auto userId = localProfile->UserId();
       if (userId == nullptr) {
         spdlog::error("Local user profile has empty UserId");
         return;
       }
 
-      if (owner != userId) {
+      if (owner != to_string(userId)) {
         spdlog::debug("Planetary map data is not for local user, skipping processing");
         return;
       }
@@ -2473,13 +2464,16 @@ namespace rtc
 
 static void HandleEntityGroup(EntityGroup* entity_group)
 {
-  if (entity_group == nullptr || entity_group->Group == nullptr || entity_group->Group->bytes == nullptr
-      || entity_group->Group->Length <= 0) {
+  if (entity_group == nullptr) {
+    return;
+  }
+  auto* const group = entity_group->Group();
+  if (group == nullptr || group->bytes() == nullptr || group->Length() <= 0) {
     return;
   }
 
-  const auto byteCount = static_cast<size_t>(entity_group->Group->Length);
-  const auto *bytesPtr = reinterpret_cast<const char*>(entity_group->Group->bytes->m_Items);
+  const auto byteCount = static_cast<size_t>(group->Length());
+  const auto *bytesPtr = reinterpret_cast<const char*>(group->bytes()->data());
 
   // Helper to run processing asynchronously with exception handling
   auto submit_async = [bytesPtr, byteCount]<typename T>(T&& func) {
@@ -2504,7 +2498,7 @@ static void HandleEntityGroup(EntityGroup* entity_group)
 
   const auto& sync_options = Config::Get().sync_options;
 
-  switch (entity_group->Type_) {
+  switch (entity_group->Type_()) {
     // away assignments
     case EntityGroup::Type::AwayAssignmentsList:
       if (sync_options.away_assignments) {
@@ -2516,7 +2510,6 @@ static void HandleEntityGroup(EntityGroup* entity_group)
         submit_async(processors::away_assignment_instance);
       }
       break;
-
     // battlelogs
     case EntityGroup::Type::BattleResultHeaders:
       if (sync_options.battlelogs) {
@@ -2697,6 +2690,14 @@ static void HandleEntityGroup(EntityGroup* entity_group)
   }
 }
 
+using GameServerModelRegistry =
+    il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServerModelRegistry">;
+using GameServer = il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServer">;
+using SlotAssignRtcParser =
+    il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotAssignRtcParser">;
+using SlotClearRtcParser =
+    il2cpp::Class<"Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotClearRtcParser">;
+
 namespace hooks
 {
 // IL2CPP value type: keep this parameter by value so following arguments retain their platform ABI positions.
@@ -2710,11 +2711,11 @@ static_assert(sizeof(CentrifugoInfo) == 16);
 static void* RtcParser_ParseFinalPayload(auto original, void* _this, CentrifugoInfo centrifugoInfo,
                                          RealtimeDataPayload* realtimeDataPayload, void* finalPayload)
 {
-  if (realtimeDataPayload != nullptr && realtimeDataPayload->Target != nullptr
-      && realtimeDataPayload->DataType != nullptr && realtimeDataPayload->Data != nullptr) {
-    if (const auto type_string = to_string(realtimeDataPayload->DataType); std::stoi(type_string) == DataType::JSON) {
-      const auto target   = to_string(realtimeDataPayload->Target);
-      const auto rtc_data = to_string(realtimeDataPayload->Data);
+  if (realtimeDataPayload != nullptr && realtimeDataPayload->Target() != nullptr
+      && realtimeDataPayload->DataType() != nullptr && realtimeDataPayload->Data() != nullptr) {
+    if (const auto type_string = to_string(realtimeDataPayload->DataType()); std::stoi(type_string) == DataType::JSON) {
+      const auto target   = to_string(realtimeDataPayload->Target());
+      const auto rtc_data = to_string(realtimeDataPayload->Data());
 
       // spdlog::debug("Received RTC payload for target '{}': {}", target, rtc_data);
       auto payload = std::make_unique<std::string>(rtc_data);
@@ -2737,10 +2738,13 @@ static void* RtcParser_ParseFinalPayload(auto original, void* _this, CentrifugoI
 static void GameServerModelRegistry_ProcessResultInternal(auto original, void* _this, void* parsing_context,
                                                           ServiceResponse* service_response, MethodInfo* method)
 {
-  auto* const entity_groups = service_response->EntityGroups;
-  for (int i = 0; i < entity_groups->Count; ++i) {
-    auto* const entity_group = entity_groups->get_Item(i);
-    HandleEntityGroup(entity_group);
+  // The hooked method is shared generic code; PlatformModelRegistry passes its own response type.
+  auto* const entity_groups =
+      service_response && service_response->Is<ServiceResponse>() ? service_response->EntityGroups() : nullptr;
+  if (entity_groups) {
+    for (auto* const entity_group : *entity_groups) {
+      HandleEntityGroup(entity_group);
+    }
   }
 
   return original(_this, parsing_context, service_response, method);
@@ -2774,74 +2778,31 @@ void InstallSyncPatches()
 {
   trackers::load_previously_sent_logs();
 
-  if (auto game_server_model_registry =
-          il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServerModelRegistry");
-      !game_server_model_registry.isValidHelper()) {
-    ErrorMsg::MissingHelper("Core", "GameServerModelRegistry");
-  } else {
-    if (auto *const ptr = game_server_model_registry.GetMethod("ProcessResultInternal"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("GameServerModelRegistry", "ProcessResultInternal");
-    } else {
-      SPUD_STATIC_DETOUR(ptr, hooks::GameServerModelRegistry_ProcessResultInternal);
-    }
+  if (auto m = GameServerModelRegistry::Method("ProcessResultInternal"))
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::GameServerModelRegistry_ProcessResultInternal);
+
+  if (auto m = PrimeApp::Class::Method("InitPrimeServer"))
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::PrimeApp_InitPrimeServer);
+
+  // This hook only captures the game version for the X-PRIME-VERSION sync header
+  // (headers::primeVersion has a static fallback). It is optional so users can turn
+  // it off when another mod detours the same method — a native and a managed detour
+  // on one prologue corrupt each other and crash at login.
+  if (!Config::Get().installGameVersionHook) {
+    spdlog::info("Sync: skipping GameServer::Initialise hook (patches.game_version = false)");
+  } else if (auto m = GameServer::Method("Initialise")) {
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::GameServer_Initialise);
   }
 
-  if (auto prime_app = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Core", "PrimeApp");
-      !prime_app.isValidHelper()) {
-    ErrorMsg::MissingHelper("Core", "PrimeApp");
-  } else {
-    if (auto *const ptr = prime_app.GetMethod("InitPrimeServer"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("PrimeApp", "InitPrimeServer");
-    } else {
-      SPUD_STATIC_DETOUR(ptr, hooks::PrimeApp_InitPrimeServer);
-    }
-  }
+  if (auto m = GameServer::Method("SetInstanceIdHeader"))
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::GameServer_SetInstanceIdHeader);
 
-  if (auto game_server =
-          il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServer");
-      !game_server.isValidHelper()) {
-    ErrorMsg::MissingHelper("Core", "GameServer");
-  } else {
-    // This hook only captures the game version for the X-PRIME-VERSION sync header
-    // (headers::primeVersion has a static fallback). It is optional so users can turn
-    // it off when another mod detours the same method — a native and a managed detour
-    // on one prologue corrupt each other and crash at login.
-    if (!Config::Get().installGameVersionHook) {
-      spdlog::info("Sync: skipping GameServer::Initialise hook (patches.game_version = false)");
-    } else if (auto *const ptr = game_server.GetMethod("Initialise"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("GameServer", "Initialise");
-    } else {
-      SPUD_STATIC_DETOUR(ptr, hooks::GameServer_Initialise);
-    }
+  // Each parser overrides ParseFinalPayload, so these are two distinct native methods.
+  if (auto m = SlotAssignRtcParser::Method("ParseFinalPayload"))
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::RtcParser_ParseFinalPayload);
 
-    if (auto *const ptr = game_server.GetMethod("SetInstanceIdHeader"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("GameServer", "SetInstanceIdHeader");
-    } else {
-      SPUD_STATIC_DETOUR(ptr, hooks::GameServer_SetInstanceIdHeader);
-    }
-  }
-
-  if (auto slot_assign_parser = il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotAssignRtcParser");
-    !slot_assign_parser.isValidHelper()) {
-    ErrorMsg::MissingHelper("Parsers", "SlotAssignRtcParser");
-    } else {
-      if (auto* const ptr = slot_assign_parser.GetMethod("ParseFinalPayload"); ptr == nullptr) {
-        ErrorMsg::MissingMethod("SlotAssignRtcParser", "ParseFinalPayload");
-      } else {
-        SPUD_STATIC_DETOUR(ptr, hooks::RtcParser_ParseFinalPayload);
-      }
-    }
-
-  if (auto slot_clear_parser = il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Parsers", "SlotClearRtcParser");
-    !slot_clear_parser.isValidHelper()) {
-    ErrorMsg::MissingHelper("Parsers", "SlotClearRtcParser");
-    } else {
-      if (auto* const ptr = slot_clear_parser.GetMethod("ParseFinalPayload"); ptr == nullptr) {
-        ErrorMsg::MissingMethod("SlotClearRtcParser", "ParseFinalPayload");
-      } else {
-        SPUD_STATIC_DETOUR(ptr, hooks::RtcParser_ParseFinalPayload);
-      }
-    }
+  if (auto m = SlotClearRtcParser::Method("ParseFinalPayload"))
+    SPUD_STATIC_DETOUR(m.Pointer(), hooks::RtcParser_ParseFinalPayload);
 
   std::thread(workers::ship_sync_data).detach();
   std::thread(workers::ship_combat_log_data).detach();
