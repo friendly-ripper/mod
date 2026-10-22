@@ -77,6 +77,10 @@ extern const Feature kForbiddenTechConfirm;
 // game_config.cc
 extern const Feature kGameConfigOverrides;
 
+// haven.cc
+extern const Feature kHavenZoom;
+extern const Feature kHavenHistory;
+
 // hotkeys.cc
 extern const Feature kHotkeys;
 // The shortcut dispatch for one frame, run by the frame tick. True when the game's own ScreenManager.Update must
@@ -140,8 +144,6 @@ float WindowDpiScale(bool refresh = false);
 // sync/sync.cc
 extern const Feature kSync;
 
-void InstallHavenZoomHooks();
-void InstallHavenHistoryHooks();
 
 
 
