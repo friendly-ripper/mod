@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-enum class ZoomLevels {
+enum class ZoomLevels : int32_t {
   None   = 0,
   Near   = 1,
   Middle = 2,
@@ -20,22 +20,15 @@ enum class ZoomLevels {
 struct NavigationLOD : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationLOD">;
 
-  void UpdateLOD(ZoomLevels level)
-  { Call<"UpdateLOD">(level); }
-
   // Writes the backing field directly; the managed setter is private.
   void SetTargetLevel(ZoomLevels level)
   { SetField<"<TargetLevel>k__BackingField">(level); }
+  void UpdateLOD(ZoomLevels level)
+  { Call<"UpdateLOD">(level); }
 };
 
 struct NavigationPan : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationPan">;
-
-  void MoveCamera(unity::Vector2 delta, bool isMomentum = false)
-  { Call<"MoveCamera">(delta, isMomentum); }
-
-  static bool BlockPan()
-  { return Class::Field<"BlockPan", bool>(); }
 
   unity::Vector2 lastDelta()
   { return Field<"_lastDelta", unity::Vector2>(); }
@@ -55,6 +48,12 @@ struct NavigationPan : il2cpp::Object {
   { return Field<"_farMagRadiusRatioSystemNormal", float>(); }
   void SetFarMagRadiusRatioSystemExtended(float value)
   { SetField<"_farMagRadiusRatioSystemExtended">(value); }
+
+  void MoveCamera(unity::Vector2 delta, bool isMomentum = false)
+  { Call<"MoveCamera">(delta, isMomentum); }
+
+  static bool BlockPan()
+  { return Class::Field<"BlockPan", bool>(); }
 };
 
 enum class NodeDepth : int32_t {
@@ -74,9 +73,6 @@ struct MathUtils {
 
 struct NavigationZoom : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationZoom">;
-
-  void ZoomCameraAtWorldPoint()
-  { Call<"ZoomCameraAtWorldPoint">(); }
 
   float Distance()
   { return Get<"Distance", float>(); }
@@ -114,6 +110,9 @@ struct NavigationZoom : il2cpp::Object {
   { SetField<"_farRatioSystemNormal">(value); }
   void SetFarRatioSystemExtended(float value)
   { SetField<"_farRatioSystemExtended">(value); }
+
+  void ZoomCameraAtWorldPoint()
+  { Call<"ZoomCameraAtWorldPoint">(); }
 };
 
 struct NavigationFleetWidget : Widget<FleetDeployedData> {
@@ -130,24 +129,24 @@ struct NavigationManager : il2cpp::Object {
   { Call<"HideInteraction">(); }
 };
 
-struct NavigationSectionManager : il2cpp::Object {
+// A plain MonoBehaviour with its own static Instance, not a MonoSingleton.
+struct NavigationSectionManager : unity::Behaviour {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationSectionManager">;
 
-  static void ChangeNavigationSection(SectionID sectionId, int64_t systemId = -1)
-  { Class::Call<"ChangeNavigationSection">(sectionId, systemId); }
+  // Named after the property, so the type needs `::` here.
+  ::NavigationManager* NavigationManager()
+  { return Get<"NavigationManager", ::NavigationManager*>(); }
 
   static NavigationSectionManager* Instance()
   { return Class::Get<"Instance", NavigationSectionManager*>(); }
-
-  // Not NavigationManager(): that would hide the type inside this struct.
-  NavigationManager* SNavigationManager()
-  { return Get<"NavigationManager", NavigationManager*>(); }
+  static void ChangeNavigationSection(SectionID sectionId, int64_t systemId = -1)
+  { Class::Call<"ChangeNavigationSection">(sectionId, systemId); }
 
   // Closes whatever interaction menu is open in space before the mod acts on a fleet.
   static void HideInteraction()
   {
     auto* section = Instance();
-    if (auto* navigation = section ? section->SNavigationManager() : nullptr)
+    if (auto* navigation = section ? section->NavigationManager() : nullptr)
       navigation->HideInteraction();
   }
 };
@@ -156,12 +155,11 @@ struct NavigationInteractionUIContext : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "NavigationInteractionUIContext">;
 };
 
-struct SetCourseWidget : il2cpp::Object {
+struct SetCourseWidget : unity::Behaviour {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "SetCourseWidget">;
+
   VisibilityController* visibilityController()
   { return Field<"_visibilityController", VisibilityController*>(); }
-  bool isActiveAndEnabled()
-  { return Get<"isActiveAndEnabled", bool>(); }
 };
 
 struct NavigationInteractionUIViewController : il2cpp::Object {
@@ -171,26 +169,15 @@ struct NavigationInteractionUIViewController : il2cpp::Object {
   {
     auto* widget     = Field<"_setCourseWidget", SetCourseWidget*>();
     auto* visibility = widget ? widget->visibilityController() : nullptr;
-    return visibility
-           && (visibility->state() == VisibilityState::Visible || visibility->state() == VisibilityState::Show)
-           && widget->isActiveAndEnabled();
+    return visibility && visibility->IsShown() && widget->isActiveAndEnabled();
   }
   void OnSetCourseButtonClick()
   { Call<"OnSetCourseButtonClick">(); }
 };
 
-struct OrbitFrameProvider : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "OrbitFrameProvider">;
-
-  // Declared on AbstractOrbitFrameProvider.
-  float RotationAngleDelta()
-  { return Field<"_rotationAngleDelta", float>(); }
-  void SetRotationAngleDelta(float value)
-  { SetField<"_rotationAngleDelta">(value); }
-};
-
 struct PopulatedSystemData : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "PopulatedSystemData">;
+
   Il2CppObject* VariationCollection()
   { return Field<"<VariationCollection>k__BackingField", Il2CppObject*>(); }
 };
@@ -198,7 +185,7 @@ struct PopulatedSystemData : il2cpp::Object {
 struct PlanetViewUtils : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.Navigation", "PlanetViewUtils">;
 
-  PopulatedSystemData* Population()
+  PopulatedSystemData* popData()
   { return Field<"_popData", PopulatedSystemData*>(); }
 
   // The planet's 2D sprite, a Component. Calling this also runs any detour on get_FlatRenderable.
@@ -236,7 +223,7 @@ struct BookmarksManager : MonoSingleton<BookmarksManager> {
     context->SetDefaultXCoordinate(zero);
     context->SetDefaultYCoordinate(zero);
     context->SetDefaultSystemInput(il2cpp::NewString(""));
-    Hub::Sections()->TriggerSectionChange(SectionID::Bookmarks_Search_Coordinates, context, false, false, true);
+    Hub::GotoSection(SectionID::Bookmarks_Search_Coordinates, context);
   }
 };
 
@@ -245,8 +232,9 @@ struct CoursePromptPopupDataContext : il2cpp::Object {
 
   bool HasInstantWarp()
   { return Field<"HasInstantWarp", bool>(); }
-  CourseData* GetCourseData()
-  { return Field<"CourseData", CourseData*>(); }
+  // A public field, named after it, so the type needs `::` here.
+  ::CourseData* CourseData()
+  { return Field<"CourseData", ::CourseData*>(); }
 };
 
 struct CoursePromptPopupWidget : Widget<CoursePromptPopupDataContext> {
@@ -261,7 +249,7 @@ struct CoursePromptPopupWidget : Widget<CoursePromptPopupDataContext> {
 struct CoursePromptPopupViewController : il2cpp::Object {
   using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Prime.ObjectViewer", "CoursePromptPopupViewController">;
 
-  CoursePromptPopupWidget* PopupWidget()
+  CoursePromptPopupWidget* coursePromptPopupWidget()
   { return Field<"_coursePromptPopupWidget", CoursePromptPopupWidget*>(); }
 };
 
@@ -273,28 +261,4 @@ struct TKTouch : il2cpp::Object {
   { return Field<"phase", unity::TouchPhase>(); }
   void SetPhase(unity::TouchPhase phase)
   { SetField<"phase">(phase); }
-};
-
-struct InteriorRadiusConstraint : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "Constraint/FloatData">;
-  bool Enabled()
-  { return Field<"_enabled", bool>(); }
-  float Minimum()
-  { return Field<"_min", float>(); }
-  float Maximum()
-  { return Field<"_max", float>(); }
-  void SetMinimum(float value)
-  { SetField<"_min">(value); }
-  void SetMaximum(float value)
-  { SetField<"_max">(value); }
-};
-struct InteriorOrbitConstraint : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "OrbitConstraint">;
-  InteriorRadiusConstraint* Radius()
-  { return Field<"_radius", InteriorRadiusConstraint*>(); }
-};
-struct InteriorOrbitProvider : il2cpp::Object {
-  using Class = il2cpp::Class<"Assembly-CSharp", "Digit.Client.CameraController", "AbstractOrbitFrameProvider">;
-  InteriorOrbitConstraint* Constraint()
-  { return Field<"_constraint", InteriorOrbitConstraint*>(); }
 };
